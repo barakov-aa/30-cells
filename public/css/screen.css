@@ -1,0 +1,135 @@
+/* Режим «Экран»: только поле, текущий ход и таблица, всё помещается в окно без прокрутки. */
+
+/* Правила на месте поля, пока команды собираются. Размер шрифта подбирает screen.js. */
+.screen-rules {
+  position: absolute; inset: 0; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 1em;
+  box-shadow: var(--shadow); padding: 1em 1.4em;
+}
+.screen-rules-inner h2 { font-size: 1.35em; margin: 0.2em 0 0.5em; }
+.screen-rules-inner .face-list { grid-template-columns: repeat(3, 1fr); gap: 0.6em; margin: 0 0 0.8em; }
+.screen-rules-inner .face { padding: 0.55em 0.7em; gap: 0.7em; border-radius: 0.7em; }
+.screen-rules-inner .face .die-mini { width: 2.4em; height: 2.4em; font-size: 1.3em; border-radius: 0.45em; }
+.screen-rules-inner .small { font-size: 0.82em; }
+.screen-rules-inner .rules-list li { margin: 0.45em 0; line-height: 1.35; }
+body.screen {
+  height: 100vh;
+  overflow: hidden;
+  font-size: clamp(14px, 1.15vw + 0.4vh, 30px);
+  cursor: default;
+}
+body.screen.idle { cursor: none; }
+body.screen.idle .screen-tools { opacity: 0; pointer-events: none; }
+
+.screen-tools {
+  position: fixed; right: 12px; bottom: 12px; z-index: 50;
+  display: flex; gap: 8px; transition: opacity .4s;
+}
+.screen-tools button { font-size: 14px; box-shadow: var(--shadow); }
+
+.screen-layout { height: 100vh; display: flex; flex-direction: column; padding: 1.2vh 1.2vw; gap: 1vh; }
+.screen-head { display: flex; align-items: center; gap: 1em; }
+.screen-title { font-weight: 800; font-size: 1.2em; }
+.screen-head .conn { margin-left: auto; font-size: 0.7em; }
+.screen-head .conn.on { opacity: .5; }
+
+.screen-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(280px, 27vw, 620px);
+  gap: 1.2vw;
+}
+
+.screen-board-wrap { position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; container-type: size; }
+.screen #board {
+  /* Поле-путь 880×900 вписывается в доступную область целиком; размеры внутри — в cqw самого поля. */
+  width: min(100cqw, 100cqh * 880 / 900);
+}
+
+.screen-canvas {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5em;
+}
+.screen-canvas-title { font-weight: 800; font-size: 1.3em; }
+.screen-canvas canvas {
+  background: #fff;
+  border: 3px solid var(--border);
+  border-radius: 1em;
+  width: min(100cqw, (100cqh - 3em) * 1.333);
+  aspect-ratio: 4 / 3;
+  box-shadow: var(--shadow);
+}
+
+.screen-side { display: flex; flex-direction: column; gap: 1.2vh; min-height: 0; }
+.screen-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1em;
+  padding: 0.9em 1em;
+  box-shadow: var(--shadow);
+  min-height: 0;
+}
+.screen-turn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 0.35em; overflow: hidden; }
+.screen-turn .st-small { color: var(--muted); font-size: 0.85em; }
+.screen-turn .st-team { font-size: 1.5em; font-weight: 900; display: flex; align-items: center; gap: 0.4em; justify-content: center; }
+.screen-turn .st-team .dot { width: 0.8em; height: 0.8em; }
+.screen-turn .die { width: 3.6em; height: 3.6em; font-size: 2.3em; margin: 0.15em auto; border-radius: 0.35em; }
+.screen-turn .st-task { font-size: 1.35em; font-weight: 800; }
+.screen-turn .st-meta { color: var(--muted); }
+.screen-turn .st-rules { font-size: 0.85em; }
+.screen-turn .st-roles { font-size: 0.9em; }
+.screen-turn .timer { font-size: 4.2em; margin: 0; line-height: 1; }
+.screen-turn .progress { width: 100%; height: 0.5em; margin: 0.2em 0; }
+.screen-turn .st-double {
+  display: inline-block; padding: 0.15em 0.7em; border-radius: 99px; font-weight: 800;
+  background: linear-gradient(135deg, #ffd43b, #f59f00); color: #5c3d00;
+}
+.screen-turn .st-join { font-size: 1.1em; font-weight: 700; word-break: break-all; background: var(--surface-2); padding: 0.4em 0.7em; border-radius: 0.5em; }
+
+.screen-teams { width: 100%; border-collapse: collapse; }
+.screen-teams td { padding: 0.3em 0.25em; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.screen-teams tr:last-child td { border-bottom: none; }
+.screen-teams tr.current td { background: rgba(240, 140, 0, 0.14); }
+.screen-teams .t-place { color: var(--muted); width: 1.4em; font-weight: 700; }
+.screen-teams .t-name { font-weight: 800; }
+.screen-teams .t-name .dot { width: 0.75em; height: 0.75em; margin-right: 0.3em; vertical-align: -0.05em; }
+.screen-teams .t-players { font-size: 0.7em; color: var(--muted); font-weight: 400; }
+.screen-teams .t-pos { font-size: 1.5em; font-weight: 900; text-align: right; font-variant-numeric: tabular-nums; }
+.screen-teams .t-pos small { font-size: 0.45em; color: var(--muted); font-weight: 600; display: block; line-height: 1; }
+.screen-teams .chip { font-size: 0.45em; width: 2.6em; height: 2.6em; }
+.screen-teams .doubles { gap: 0.15em; }
+
+.screen-winner {
+  position: fixed; inset: 0; z-index: 40; display: grid; place-items: center;
+  background: rgba(20, 12, 5, 0.6); animation: banner-in .6s ease-out;
+}
+.screen-winner .winner-banner { max-width: 90vw; font-size: clamp(14px, 1.6em, 5vw); padding: 1.2em 2.4em; border-radius: 1em; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+.screen-winner .winner-banner .big { font-size: 2.4em; }
+
+.screen-fatal { position: fixed; inset: 0; display: grid; place-items: center; }
+
+@media (max-aspect-ratio: 1/1) {
+  .screen-main { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1.3fr) minmax(0, 1fr); }
+  .screen-side { flex-direction: row; }
+  .screen-side > * { flex: 1; overflow: auto; }
+}
+.screen-turn .die.rolling-loop { animation: roll .45s linear infinite; }
+
+.screen-turn .st-qr {
+  /* QR сжимается, если в колонке не хватает места для таблицы команд. */
+  height: 34vh;
+  min-height: 110px;
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background: #fff;
+  padding: 0.4em;
+  border-radius: 0.6em;
+  border: 1px solid var(--border);
+  image-rendering: pixelated;
+}
+.screen-turn .st-join { font-size: 0.9em; }
+.screen-side > .screen-panel:last-child { flex: 0 0 auto; max-height: 55%; overflow: auto; }
+.screen-turn { flex: 1 1 0; min-height: 0; }

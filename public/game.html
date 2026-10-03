@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Игра — 30 клеток</title>
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#d9480f">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" id="brand" href="/">🎲 30 <span>клеток</span></a>
+    <strong id="game-name"></strong>
+    <span id="game-status" class="badge"></span>
+    <div class="spacer"></div>
+    <span id="me" class="small"></span>
+    <span id="conn" class="conn off">● нет связи</span>
+  </header>
+
+  <main class="container hidden" id="fatal">
+    <div class="card form-narrow">
+      <h2>Упс</h2>
+      <p id="fatal-text"></p>
+      <a class="btn" href="/">На главную</a>
+    </div>
+  </main>
+
+  <main class="container hidden" id="join">
+    <form class="card form-narrow stack" id="join-form">
+      <h1>Добро пожаловать!</h1>
+      <p class="muted" id="join-game"></p>
+      <div><label for="join-name">Ваше имя</label><input id="join-name" maxlength="30" autocomplete="nickname" required></div>
+      <div class="error" id="join-error"></div>
+      <button class="primary big" type="submit">Войти в игру</button>
+    </form>
+  </main>
+
+  <div class="game-layout hidden" id="game">
+    <div class="stack" style="min-width: 0">
+      <div class="board" id="board"></div>
+      <div class="card hidden" id="draw-panel">
+        <div class="row"><h3 style="margin: 0">✏️ Рисунок</h3><div class="spacer"></div><span class="muted small" id="draw-hint"></span></div>
+        <div class="canvas-wrap" style="margin-top: 8px"><canvas id="canvas" width="1200" height="900"></canvas></div>
+        <div class="canvas-tools" id="draw-tools"></div>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div id="winner"></div>
+      <section class="card turn-card" id="turn"></section>
+      <section class="card minimap" id="minimap">
+        <div class="mm-me" id="mm-me"></div>
+        <div class="mm-track" id="mm-track"></div>
+        <div class="mm-scale"><span>🚩 1</span><span class="mm-scale-movie" style="left: calc(9 / 29 * 100%)">🎬 10</span><span class="mm-scale-movie" style="left: calc(20 / 29 * 100%)">🎬 21</span><span>30 🏁</span></div>
+        <div class="mm-move hidden" id="mm-move"></div>
+        <button class="link small mm-toggle" data-act="toggle-board">🗺️ Показать всё поле</button>
+      </section>
+      <section class="card hidden" id="team-pick"></section>
+      <section class="card" id="teams-card">
+        <h2>Команды</h2>
+        <table class="teams-table">
+          <thead><tr><th>Команда</th><th title="Клетка">📍</th><th>Удвоения</th></tr></thead>
+          <tbody id="teams"></tbody>
+        </table>
+      </section>
+      <section class="card hidden" id="admin"></section>
+      <section class="card" id="log-card">
+        <h2>Журнал</h2>
+        <ul class="log" id="log"></ul>
+      </section>
+    </aside>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/board.js"></script>
+  <script src="/js/game.js"></script>
+</body>
+</html>

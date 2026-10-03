@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Экран — 30 клеток</title>
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#d9480f">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/screen.css">
+</head>
+<body class="screen">
+  <div class="screen-tools" id="tools">
+    <button id="btn-sound" title="Звуковые сигналы таймера">🔇 Включить звук</button>
+    <button id="btn-full" title="Во весь экран (F)">⛶ Во весь экран</button>
+  </div>
+
+  <div class="screen-fatal hidden" id="fatal"><div class="card"><h2>Экран недоступен</h2><p id="fatal-text"></p></div></div>
+
+  <div class="screen-layout" id="layout">
+    <header class="screen-head">
+      <span class="screen-title" id="title"></span>
+      <span class="conn off" id="conn">● нет связи</span>
+    </header>
+    <main class="screen-main">
+      <div class="screen-board-wrap">
+        <div id="board"></div>
+        <div class="screen-canvas hidden" id="canvas-wrap">
+          <div class="screen-canvas-title" id="canvas-title">✏️ Рисунок</div>
+          <canvas id="canvas" width="1200" height="900"></canvas>
+        </div>
+        <section class="screen-rules rules hidden" id="rules"></section>
+      </div>
+      <aside class="screen-side">
+        <section class="screen-panel screen-turn" id="turn"></section>
+        <section class="screen-panel">
+          <table class="screen-teams"><tbody id="teams"></tbody></table>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <div class="screen-winner hidden" id="winner"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/board.js"></script>
+  <script src="/js/rules.js"></script>
+  <script src="/js/screen.js"></script>
+</body>
+</html>

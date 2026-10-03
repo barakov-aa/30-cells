@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Настолка «30 клеток»</title>
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#d9480f">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">🎲 30 <span>клеток</span></a>
+    <div class="spacer"></div>
+    <a class="btn primary" href="/admin">Вход администратора</a>
+  </header>
+  <main class="container">
+    <section class="card">
+      <h1>Командная настольная игра</h1>
+      <p>Команды по 2 человека проходят поле от клетки <b>1</b> (старт) до <b>30</b> (финиш). Побеждает команда, первой дошедшая до финиша.</p>
+      <p class="muted">Чтобы присоединиться, откройте ссылку-приглашение от администратора и введите своё имя — регистрация не нужна.</p>
+    </section>
+    <section class="card rules" id="rules"><p class="muted">Загрузка правил…</p></section>
+    <footer class="version-info" id="version"></footer>
+  </main>
+  <script src="/js/common.js"></script>
+  <script src="/js/rules.js"></script>
+  <script>
+    window.App.api('GET', '/api/config')
+      .then((config) => { document.getElementById('rules').innerHTML = window.Rules.html(config); })
+      .catch(() => { document.getElementById('rules').innerHTML = '<p class="muted">Не удалось загрузить правила — обновите страницу.</p>'; });
+
+    // Версия и история изменений (из package.json и CHANGELOG.md на сервере).
+    window.App.api('GET', '/api/version').then(({ version, releases }) => {
+      const { esc } = window.App;
+      const date = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split('-').reverse().join('.') : d);
+      const current = releases.find((r) => r.version === version);
+      const history = releases.map((r) => `
+        <div class="release">
+          <div class="release-head"><b>Версия ${esc(r.version)}</b>${r.date ? ` <span class="muted">· ${esc(date(r.date))}</span>` : ''}</div>
+          ${r.summary.map((s) => `<p>${esc(s)}</p>`).join('')}
+          ${r.changes.length ? `<ul>${r.changes.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}
+        </div>`).join('');
+      document.getElementById('version').innerHTML = `
+        <div>🎲 30 клеток · версия <b>${esc(version)}</b>${current?.date ? ` от ${esc(date(current.date))}` : ''}</div>
+        ${releases.length ? `<details><summary>Что нового</summary>${history}</details>` : ''}`;
+    }).catch(() => {});
+  </script>
+</body>
+</html>

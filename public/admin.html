@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Администратор — 30 клеток</title>
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#d9480f">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">🎲 30 <span>клеток</span></a>
+    <div class="spacer"></div>
+    <button id="logout" class="hidden">Выйти</button>
+  </header>
+
+  <main class="container">
+    <form id="login" class="card form-narrow stack hidden">
+      <h1>Вход администратора</h1>
+      <div><label for="login-name">Логин</label><input id="login-name" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></div>
+      <div><label for="login-pass">Пароль</label><input id="login-pass" name="password" type="password" autocomplete="current-password" required></div>
+      <div class="error" id="login-error"></div>
+      <button class="primary big" type="submit">Войти</button>
+    </form>
+
+    <div id="dashboard" class="hidden">
+      <div class="tabs">
+        <button data-tab="games" class="active">Игры</button>
+        <button data-tab="cards">Карточки</button>
+        <button data-tab="complications">Усложнения</button>
+      </div>
+
+      <section id="tab-games">
+        <form id="create" class="card">
+          <h2>Новая игра</h2>
+          <div class="row">
+            <input id="create-name" placeholder="Название, например «Пятничная игра»" style="flex: 1 1 240px">
+            <label class="row" style="margin: 0" title="Гости могут только вступать в команды, которые создал администратор">Команд:
+              <select id="create-teams">
+                <option value="0">0 — добавлю позже</option>
+                <option value="1">1</option><option value="2" selected>2</option><option value="3">3</option>
+                <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+                <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+                <option value="10">10</option>
+              </select>
+            </label>
+            <button class="primary" type="submit">Создать</button>
+          </div>
+        </form>
+        <div class="card">
+          <h2>Мои игры</h2>
+          <div id="games" class="games"><p class="muted">Загрузка…</p></div>
+        </div>
+      </section>
+
+      <section id="tab-cards" class="hidden">
+        <div class="card ed" id="cards-editor"></div>
+      </section>
+
+      <section id="tab-complications" class="hidden">
+        <div class="card ed" id="complications-editor"></div>
+      </section>
+    </div>
+  </main>
+  <script src="/js/common.js"></script>
+  <script src="/js/list-editor.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>
