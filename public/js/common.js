@@ -57,5 +57,11 @@ window.App = (() => {
 
   const STATUS = { lobby: 'Набор команд', playing: 'Идёт игра', finished: 'Завершена' };
 
-  return { esc, api, toast, copy, storage, STATUS };
+  // «482913» → «482 913»: так код легче прочитать вслух и сверить.
+  function formatCode(code) {
+    const s = String(code ?? '');
+    return /^\d{6}$/.test(s) ? `${s.slice(0, 3)} ${s.slice(3)}` : s;
+  }
+
+  return { esc, api, toast, copy, storage, formatCode, STATUS };
 })();

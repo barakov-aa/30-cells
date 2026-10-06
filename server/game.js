@@ -103,13 +103,33 @@ function newId(bytes = 8) {
 }
 
 function newCode() {
-  // Короткий код приглашения без похожих символов.
+  // Длинный код без похожих символов — для ссылки на общий экран (её не вводят руками).
   const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
   let code = '';
   const bytes = crypto.randomBytes(8);
   for (const b of bytes) code += alphabet[b % alphabet.length];
   return code;
 }
+
+// Код приглашения для гостей — только цифры, чтобы его было легко продиктовать и ввести с телефона.
+const JOIN_CODE_LENGTH = 6;
+const JOIN_CODE_RE = new RegExp(`^[1-9][0-9]{${JOIN_CODE_LENGTH - 1}}$`);
+
+function newJoinCode(isTaken = () => false) {
+  const min = 10 ** (JOIN_CODE_LENGTH - 1);
+  for (let i = 0; i < 1000; i += 1) {
+    const code = String(crypto.randomInt(min, min * 10));
+    if (!isTaken(code)) return code;
+  }
+  throw new GameError('Не удалось подобрать свободный код игры');
+}
+
+// Код из ссылки или введённый руками: без пробелов и дефисов, старые буквенные коды — в нижнем регистре.
+function normalizeJoinCode(input) {
+  return String(input ?? '').replace(/[\s-]+/g, '').toLowerCase();
+}
+
+const isJoinCode = (code) => JOIN_CODE_RE.test(String(code));
 
 function clampCell(n) {
   return Math.max(START_CELL, Math.min(BOARD_SIZE, Math.round(n)));
@@ -128,7 +148,7 @@ function createGame(name) {
   const title = String(name || '').trim().slice(0, 60) || 'Новая игра';
   return {
     id: newId(),
-    code: newCode(),
+    code: newJoinCode(),
     screenCode: newCode(),
     name: title,
     createdAt: Date.now(),
@@ -831,6 +851,10 @@ module.exports = {
   GameError,
   newId,
   newCode,
+  newJoinCode,
+  normalizeJoinCode,
+  isJoinCode,
+  JOIN_CODE_LENGTH,
   log,
   createGame,
   addPlayer,

@@ -8,10 +8,13 @@ const QRCode = require('qrcode');
 const { Server } = require('socket.io');
 const G = require('./game');
 const store = require('./store');
+const { inviteOrigin } = require('./urls');
 
 const PORT = Number(process.env.PORT) || 3000;
 const ADMIN_LOGIN = process.env.ADMIN_LOGIN || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
+// Адрес сайта для QR-кода, например https://zagzak.ru (необязательно).
+const PUBLIC_URL = process.env.PUBLIC_URL || '';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const MAX_STROKES = 3000;
@@ -50,6 +53,39 @@ store.load();
 
 const sessions = new Map(); // token -> expiresAt
 const loginAttempts = new Map(); // ip -> { count, resetAt }
+
+// Защита от подбора кодов приглашения: с одного адреса — не больше 30 неверных кодов за 10 минут.
+const JOIN_MISS_LIMIT = 30;
+const JOIN_MISS_WINDOW_MS = 10 * 60 * 1000;
+const JOIN_BLOCKED_MESSAGE = 'Слишком много попыток ввести код. Подождите 10 минут и попробуйте снова.';
+const joinMisses = new Map(); // ip -> { count, resetAt }
+
+function joinBlocked(ip) {
+  const miss = joinMisses.get(ip);
+  return Boolean(miss && miss.resetAt > Date.now() && miss.count >= JOIN_MISS_LIMIT);
+}
+
+function countJoinMiss(ip) {
+  const now = Date.now();
+  let miss = joinMisses.get(ip);
+  if (!miss || miss.resetAt < now) {
+    miss = { count: 0, resetAt: now + JOIN_MISS_WINDOW_MS };
+    joinMisses.set(ip, miss);
+  }
+  miss.count += 1;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, miss] of joinMisses) if (miss.resetAt < now) joinMisses.delete(ip);
+}, JOIN_MISS_WINDOW_MS).unref();
+
+// Адрес игрока для сокета. За nginx (TRUST_PROXY) настоящий адрес — последний в X-Forwarded-For.
+function socketIp(socket) {
+  const forwarded = socket.handshake.headers['x-forwarded-for'];
+  if (process.env.TRUST_PROXY && forwarded) return String(forwarded).split(',').pop().trim();
+  return socket.handshake.address;
+}
 
 function parseCookies(header) {
   const out = {};
@@ -200,9 +236,14 @@ app.post('/api/admin/complications/reset', requireAdmin, (req, res) => {
 });
 
 app.get('/api/join/:code', (req, res) => {
+  if (joinBlocked(req.ip)) return res.status(429).json({ error: JOIN_BLOCKED_MESSAGE });
   const game = store.findByCode(req.params.code);
-  if (!game) return res.status(404).json({ error: 'Игра не найдена. Проверьте ссылку.' });
-  res.json({ name: game.name, status: game.status });
+  if (!game) {
+    countJoinMiss(req.ip);
+    return res.status(404).json({ error: 'Игра с таким кодом не найдена. Проверьте код или ссылку.' });
+  }
+  // code — действующий числовой код: по старой буквенной ссылке страница перейдёт на него.
+  res.json({ name: game.name, status: game.status, code: game.code });
 });
 
 app.get('/api/screen/:code', (req, res) => {
@@ -211,12 +252,13 @@ app.get('/api/screen/:code', (req, res) => {
   res.json({ name: game.name, status: game.status });
 });
 
-// QR-код ссылки-приглашения для общего экрана. Адрес берётся из запроса,
-// поэтому экран нужно открывать по тому же адресу, по которому зайдут игроки.
+// QR-код ссылки-приглашения для общего экрана: PUBLIC_URL или адрес, по которому открыт экран
+// (страница экрана передаёт его в ?origin=), — например https://zagzak.ru/join/482913.
 app.get('/api/screen/:code/qr.svg', async (req, res) => {
   const game = store.findByScreenCode(req.params.code);
   if (!game) return res.status(404).end();
-  const url = `${req.protocol}://${req.get('host')}/join/${game.code}`;
+  const origin = inviteOrigin({ publicUrl: PUBLIC_URL, pageOrigin: req.query.origin, host: req.get('host'), protocol: req.protocol });
+  const url = `${origin}/join/${game.code}`;
   const svg = await QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
   res.type('image/svg+xml').set('Cache-Control', 'no-store').send(svg);
 });
@@ -244,6 +286,7 @@ app.get('/favicon.ico', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'icons'
 app.get('/', sendPage('index.html'));
 app.get('/admin', sendPage('admin.html'));
 app.get('/admin/game/:id', sendPage('game.html'));
+app.get('/join', sendPage('game.html'));
 app.get('/join/:code', sendPage('game.html'));
 app.get('/screen/:code', sendPage('screen.html'));
 app.use(express.static(PUBLIC_DIR, { index: false }));
@@ -409,7 +452,9 @@ const ADMIN_ACTIONS = {
     game.name = name;
   },
   newInvite: (game) => {
-    game.code = G.createGame().code;
+    // Новый код: старые ссылки и коды (включая буквенные) перестают работать.
+    game.code = G.newJoinCode(store.isCodeTaken);
+    game.legacyCodes = [];
   },
   finishGame: (game) => {
     game.status = 'finished';
@@ -460,7 +505,13 @@ io.on('connection', (socket) => {
     game = store.findByScreenCode(String(auth.screen));
     if (game) ctx.screen = true;
   } else if (auth.code) {
+    const ip = socketIp(socket);
+    if (joinBlocked(ip)) {
+      socket.emit('fatal', { message: JOIN_BLOCKED_MESSAGE });
+      return socket.disconnect(true);
+    }
     game = store.findByCode(String(auth.code));
+    if (!game) countJoinMiss(ip);
     if (game && auth.token) {
       const player = Object.values(game.players).find((p) => p.token === auth.token);
       if (player) ctx.playerId = player.id;

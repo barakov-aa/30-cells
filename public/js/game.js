@@ -1,14 +1,15 @@
 'use strict';
 
 (() => {
-  const { esc, api, toast, copy, storage, STATUS } = window.App;
+  const { esc, api, toast, copy, storage, formatCode, STATUS } = window.App;
   const $ = (sel) => document.querySelector(sel);
 
   const adminMatch = location.pathname.match(/^\/admin\/game\/([^/]+)/);
   const joinMatch = location.pathname.match(/^\/join\/([^/]+)/);
   const isAdmin = Boolean(adminMatch);
-  const code = joinMatch ? decodeURIComponent(joinMatch[1]) : null;
-  const tokenKey = code ? `token:${code}` : null;
+  // Код игры из ссылки /join/<код>; на странице /join без кода игрок вводит его сам.
+  let code = joinMatch ? decodeURIComponent(joinMatch[1]) : null;
+  let tokenKey = code ? `token:${code}` : null;
   if (!isAdmin) document.body.classList.add('player');
 
   let config = null;
@@ -18,7 +19,7 @@
   let lastRenderedPhase = null;
   let beeped = null;
 
-  const view = { game: $('#game'), join: $('#join'), fatal: $('#fatal') };
+  const view = { game: $('#game'), join: $('#join'), code: $('#code'), fatal: $('#fatal') };
   function show(name) {
     for (const [key, el] of Object.entries(view)) el.classList.toggle('hidden', key !== name);
   }
@@ -40,6 +41,7 @@
   socket.on('fatal', ({ message, login }) => {
     socket.disconnect();
     if (login) location.href = '/admin';
+    else if (!isAdmin) showCodeForm(message);
     else fatal(message);
   });
   socket.on('gone', ({ message }) => {
@@ -482,12 +484,14 @@
       </div>`;
 
     el.innerHTML = `<h2>👑 Управление</h2>
-      <label>Ссылка для гостей</label>
-      <div class="row"><div class="invite" style="flex:1">${esc(invite)}</div></div>
+      <label>Код игры и ссылка для гостей</label>
+      <div class="row"><span class="join-code">${esc(formatCode(state.code))}</span>
+        <span class="muted small">— вводится на ${esc(location.host)}/join</span></div>
+      <div class="row" style="margin-top:4px"><div class="invite" style="flex:1">${esc(invite)}</div></div>
       <div class="row" style="margin-top:6px">
         <button data-act="copy-invite">📋 Копировать</button>
         <a class="btn" href="/screen/${esc(state.screenCode)}" target="_blank" rel="noopener" title="Поле для общего экрана без лишних элементов">📺 Экран</a>
-        <button data-act="new-invite" title="Старая ссылка перестанет работать для новых гостей">🔄 Новая ссылка</button>
+        <button data-act="new-invite" title="Старые ссылка и код перестанут работать для новых гостей">🔄 Новый код</button>
         <button data-act="rename-game">✎ Название</button>
       </div>
       <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
@@ -549,6 +553,7 @@
 
   document.addEventListener('focusout', () => {
     setTimeout(() => {
+      if (!state) return; // игра ещё не загружена (например, открыта форма ввода кода)
       if (adminDirty && !focusedInside($('#admin'))) renderAdmin();
       if (!focusedInside($('#team-pick'))) renderTeamPick();
     }, 0);
@@ -791,14 +796,67 @@
     redraw();
   });
 
+  // ---------- Вход по коду ----------
+
+  function showCodeForm(message = '', value = '') {
+    document.title = 'Вход в игру — 30 клеток';
+    $('#conn').classList.add('hidden'); // к игре ещё не подключаемся — «нет связи» только сбивало бы с толку
+    $('#code-error').textContent = message;
+    if (value) $('#code-input').value = value;
+    show('code');
+    $('#code-input').focus();
+  }
+
+  // По старой буквенной ссылке переходим на числовой код и переносим сохранённый вход игрока.
+  function adoptCode(canonical) {
+    const newKey = `token:${canonical}`;
+    const saved = storage(tokenKey);
+    if (saved && !storage(newKey)) storage(newKey, saved);
+    code = canonical;
+    tokenKey = newKey;
+    history.replaceState(null, '', `/join/${encodeURIComponent(canonical)}`);
+  }
+
+  $('#code-input').addEventListener('input', (e) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
+    if (digits !== e.target.value) e.target.value = digits;
+    $('#code-error').textContent = '';
+  });
+
+  $('#code-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const value = $('#code-input').value.replace(/\D/g, '');
+    if (value.length !== 6) {
+      $('#code-error').textContent = 'Код игры — 6 цифр';
+      return;
+    }
+    const button = e.target.querySelector('button');
+    button.disabled = true;
+    try {
+      const info = await api('GET', `/api/join/${value}`);
+      location.assign(`/join/${encodeURIComponent(info.code)}`);
+    } catch (err) {
+      $('#code-error').textContent = err.message;
+      button.disabled = false;
+    }
+  });
+
   // ---------- Старт ----------
 
   (async () => {
     try {
       config = await api('GET', '/api/config');
-      if (code) await api('GET', `/api/join/${encodeURIComponent(code)}`);
     } catch (err) {
       return fatal(err.message);
+    }
+    if (!isAdmin && !code) return showCodeForm();
+    if (code) {
+      try {
+        const info = await api('GET', `/api/join/${encodeURIComponent(code)}`);
+        if (info.code && info.code !== code) adoptCode(info.code);
+      } catch (err) {
+        return showCodeForm(err.message, /^\d+$/.test(code) ? code : '');
+      }
     }
     socket.connect();
     return undefined;

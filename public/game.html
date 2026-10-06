@@ -29,6 +29,18 @@
     </div>
   </main>
 
+  <main class="container hidden" id="code">
+    <form class="card form-narrow stack" id="code-form" novalidate>
+      <h1>Вход в игру</h1>
+      <p class="muted">Введите код игры — 6 цифр. Его показывают на общем экране и в ссылке-приглашении.</p>
+      <div><label for="code-input">Код игры</label>
+        <input id="code-input" class="code-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="7"
+          autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="000000" required></div>
+      <div class="error" id="code-error"></div>
+      <button class="primary big" type="submit">Продолжить</button>
+    </form>
+  </main>
+
   <main class="container hidden" id="join">
     <form class="card form-narrow stack" id="join-form">
       <h1>Добро пожаловать!</h1>

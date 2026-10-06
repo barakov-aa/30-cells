@@ -1,7 +1,7 @@
 'use strict';
 
 (() => {
-  const { esc, api } = window.App;
+  const { esc, api, formatCode } = window.App;
   const $ = (sel) => document.querySelector(sel);
   const screenCode = decodeURIComponent(location.pathname.split('/')[2] || '');
 
@@ -174,9 +174,9 @@
       el.innerHTML = `<div class="st-task">Скоро начнём!</div>
         <div class="st-meta">Наведите камеру телефона на QR-код:</div>
         <img class="st-qr" alt="QR-код для входа в игру"
-          src="/api/screen/${encodeURIComponent(screenCode)}/qr.svg?v=${encodeURIComponent(state.code)}">
-        <div class="st-meta">или откройте ссылку:</div>
-        <div class="st-join">${esc(`${location.origin}/join/${state.code}`)}</div>`;
+          src="/api/screen/${encodeURIComponent(screenCode)}/qr.svg?v=${encodeURIComponent(state.code)}&origin=${encodeURIComponent(location.origin)}">
+        <div class="st-meta">или откройте <b>${esc(location.host)}/join</b> и введите код:</div>
+        <div class="st-code">${esc(formatCode(state.code))}</div>`;
       return;
     }
     delete el.dataset.lobby;

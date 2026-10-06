@@ -561,3 +561,24 @@ test('если колоды «?»-заданий закончились, «?» �
   G.roll(game, deck, seq(at(3, 6), 0.1));
   assert.equal(game.turn.category, 'music');
 });
+
+test('код приглашения — 6 цифр без ведущего нуля, занятые коды пропускаются', () => {
+  for (let i = 0; i < 200; i += 1) {
+    const code = G.newJoinCode();
+    assert.match(code, /^[1-9]\d{5}$/);
+    assert.ok(G.isJoinCode(code));
+  }
+  assert.match(G.createGame('Тест').code, /^[1-9]\d{5}$/);
+  const taken = new Set();
+  for (let i = 0; i < 50; i += 1) taken.add(G.newJoinCode((c) => taken.has(c)));
+  assert.equal(taken.size, 50);
+  assert.equal(G.isJoinCode('b4xw2t5m'), false);
+  assert.equal(G.isJoinCode('012345'), false);
+});
+
+test('введённый код очищается от пробелов и дефисов', () => {
+  assert.equal(G.normalizeJoinCode(' 482 913 '), '482913');
+  assert.equal(G.normalizeJoinCode('482-913'), '482913');
+  assert.equal(G.normalizeJoinCode('B4XW2T5M'), 'b4xw2t5m');
+  assert.equal(G.normalizeJoinCode(undefined), '');
+});

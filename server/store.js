@@ -6,7 +6,9 @@ const fs = require('fs');
 const path = require('path');
 const defaultCards = require('./defaultCards');
 const defaultComplications = require('./defaultComplications');
-const { CATEGORIES, MOVIE_TITLES_PER_CARD, GUEST_POOL, newCode, ensureTraps } = require('./game');
+const {
+  CATEGORIES, MOVIE_TITLES_PER_CARD, GUEST_POOL, newCode, newJoinCode, isJoinCode, normalizeJoinCode, ensureTraps,
+} = require('./game');
 
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, '..', 'data'));
 const GAMES_FILE = path.join(DATA_DIR, 'games.json');
@@ -38,12 +40,27 @@ function readJson(file, fallback) {
   }
 }
 
+function isCodeTaken(code) {
+  for (const g of games.values()) {
+    if (g.code === code || (g.legacyCodes || []).includes(code)) return true;
+  }
+  return false;
+}
+
 function load() {
   const list = readJson(GAMES_FILE, []);
   for (const game of list) {
     if (!game.screenCode) game.screenCode = newCode();
     ensureTraps(game);
     games.set(game.id, game);
+  }
+  // До 1.4.0 коды приглашений были буквенно-цифровыми. Игра получает числовой код,
+  // а старый остаётся рабочим, чтобы уже разосланные ссылки не перестали открываться.
+  for (const game of games.values()) {
+    if (isJoinCode(game.code)) continue;
+    game.legacyCodes = [...new Set([...(game.legacyCodes || []), game.code])];
+    game.code = newJoinCode(isCodeTaken);
+    scheduleSave();
   }
   cards = normalizeCards(readJson(CARDS_FILE, defaultCards));
   complications = normalizeComplications(readJson(COMPLICATIONS_FILE, defaultComplications));
@@ -138,9 +155,15 @@ module.exports = {
   setComplications,
   resetComplications,
   getGame: (id) => games.get(id),
-  findByCode: (code) => [...games.values()].find((g) => g.code === code),
+  findByCode(input) {
+    const code = normalizeJoinCode(input);
+    if (!code) return undefined;
+    return [...games.values()].find((g) => g.code === code || (g.legacyCodes || []).includes(code));
+  },
+  isCodeTaken,
   findByScreenCode: (code) => [...games.values()].find((g) => g.screenCode === code),
   addGame(game) {
+    if (isCodeTaken(game.code)) game.code = newJoinCode(isCodeTaken);
     games.set(game.id, game);
     scheduleSave();
   },

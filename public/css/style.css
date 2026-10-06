@@ -569,3 +569,9 @@ label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 
   .ed-fields-2 { grid-template-columns: 1fr; }
   .ed-actions { opacity: 1; }
 }
+
+/* Поле кода игры: крупные цифры, чтобы было удобно вводить с телефона. */
+.code-input { font-size: 2rem; font-weight: 800; text-align: center; letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
+.code-input::placeholder { color: var(--border); }
+.join-code { font-size: 1.6rem; font-weight: 900; letter-spacing: 0.12em; font-variant-numeric: tabular-nums; }
+.join-code.small-code { font-size: 1.05rem; white-space: nowrap; }

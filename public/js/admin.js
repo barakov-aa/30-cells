@@ -1,7 +1,7 @@
 'use strict';
 
 (() => {
-  const { esc, api, toast, copy, STATUS } = window.App;
+  const { esc, api, toast, copy, formatCode, STATUS } = window.App;
   const $ = (sel) => document.querySelector(sel);
 
   async function init() {
@@ -65,7 +65,8 @@
           <div class="row small" style="margin-top: 4px">
             ${g.teams.map((t) => `<span class="row" style="gap: 4px"><span class="dot" style="background:${esc(t.color)}"></span>${esc(t.name)} (${t.players}/2) — ${t.position}</span>`).join('') || '<span class="muted">Команд нет</span>'}
           </div>
-          <div class="invite" style="margin-top: 6px">${esc(inviteUrl(g.code))}</div>
+          <div class="row" style="margin-top: 6px"><span class="join-code small-code">${esc(formatCode(g.code))}</span>
+            <div class="invite" style="flex: 1">${esc(inviteUrl(g.code))}</div></div>
         </div>
         <div class="row">
           <button data-copy="${esc(g.code)}">📋 Ссылка для гостей</button>

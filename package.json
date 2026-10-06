@@ -1,6 +1,6 @@
 {
   "name": "dr-board-game",
-  "version": "1.3.1",
+  "version": "1.4.1",
   "description": "Онлайн-настолка: поле 1–30, команды по 2 человека, кубик с заданиями, удвоения и карточки с фильмами",
   "main": "server/index.js",
   "private": true,
