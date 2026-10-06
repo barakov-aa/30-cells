@@ -67,14 +67,14 @@ const CATEGORIES = {
 
 const TASK_CATEGORIES = ['yesno', 'talk', 'gestures', 'music', 'drawing'];
 // На грани «?» играют только эти задания (время и баллы — как в соответствующей категории).
-const RANDOM_TASKS = ['yesno', 'talk', 'gestures'];
+const RANDOM_TASKS = ['talk', 'gestures', 'drawing'];
 
 // Отдельный пул слов для грани «?» (про гостей игры). Случайно выбирается только задание.
 const GUEST_POOL = 'random';
 const GUEST_POOL_INFO = {
   title: '«?» — про гостей',
   icon: '?',
-  rules: 'Слова и выражения про гостей игры. Выпадают только на грани «?»; задание к ним (Да / Нет, словами или жестами) выбирается случайно.',
+  rules: 'Слова и выражения про гостей игры. Выпадают только на грани «?»; задание к ним (объяснить словами, жестами или рисование) выбирается случайно.',
 };
 
 const DIE_FACES = ['yesno', 'talk', 'gestures', 'music', 'drawing', 'random'];

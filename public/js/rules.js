@@ -28,7 +28,7 @@ window.Rules = (() => {
       {
         icon: '?',
         title: 'Случайное задание',
-        text: `${c.yesno.title}, ${c.talk.title.toLowerCase()} или ${c.gestures.title.toLowerCase()} — слово про гостей игры (время и баллы — как у выпавшего задания)`,
+        text: `${c.talk.title}, ${c.gestures.title.toLowerCase()} или ${c.drawing.title.toLowerCase()} — слово про гостей игры (время и баллы — как у выпавшего задания)`,
       },
     ];
   }

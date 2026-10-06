@@ -92,16 +92,20 @@ test('фишки удвоения заканчиваются', () => {
   assert.throws(() => G.setDouble(game, true), /закончились/);
 });
 
-test('грань «?» выбирает одно из трёх заданий: Да/Нет, словами, жестами', () => {
+test('грань «?» выбирает одно из трёх заданий: словами, жестами, рисование', () => {
   const game = setup();
-  G.roll(game, cards, seq(at(5, 6), at(2, 3), 0.2));
+  G.roll(game, cards, seq(at(5, 6), at(1, 3), 0.2));
   assert.equal(game.turn.face, 'random');
   assert.equal(game.turn.category, 'gestures');
   assert.equal(game.turn.seconds, 60);
-  assert.deepEqual(G.RANDOM_TASKS, ['yesno', 'talk', 'gestures']);
+  assert.deepEqual(G.RANDOM_TASKS, ['talk', 'gestures', 'drawing']);
+  G.adminCancelTurn(game);
+  G.roll(game, cards, seq(at(5, 6), at(2, 3), 0.2));
+  assert.equal(game.turn.category, 'drawing');
+  assert.equal(game.turn.seconds, 60);
 });
 
-test('на «?» никогда не выпадают «Песни» и «Рисование»', () => {
+test('на «?» выпадает и рисование, но никогда не выпадают «Да / Нет» и «Песни»', () => {
   const game = setup(1);
   const seen = new Set();
   for (let i = 0; i < 30; i += 1) {
@@ -109,7 +113,7 @@ test('на «?» никогда не выпадают «Песни» и «Рис
     seen.add(game.turn.category);
     G.adminCancelTurn(game);
   }
-  assert.deepEqual([...seen].sort(), ['gestures', 'talk', 'yesno']);
+  assert.deepEqual([...seen].sort(), ['drawing', 'gestures', 'talk']);
 });
 
 test('клетки 10 и 21 — карточка «Кино» без кубика и без удвоения', () => {
@@ -279,7 +283,7 @@ test('одинаковое слово в разных категориях ра�
 test('слово из пула «?» не мешает такой же карточке в обычной колоде', () => {
   const game = setup(1);
   const deck = { ...cards, talk: ['Кот Аси'], random: ['Кот Аси'] };
-  G.roll(game, deck, seq(at(5, 6), at(1, 3), 0.1));
+  G.roll(game, deck, seq(at(5, 6), at(0, 3), 0.1));
   assert.equal(game.turn.fromPool, true);
   G.adminCancelTurn(game);
   assert.equal(drawTurn(game, deck, 1).card, 'Кот Аси');
@@ -502,8 +506,8 @@ const withPool = (pool) => ({ ...cards, random: pool });
 test('на «?» задание случайное, а слово из пула про гостей', () => {
   const game = setup(1);
   const deck = withPool(['Лыжи Миши', 'Кот Аси']);
-  // «?» → задание «Жестами» (индекс 2 из 3) → первое свободное слово пула.
-  G.roll(game, deck, seq(RANDOM_FACE, at(2, 3), 0.1));
+  // «?» → задание «Жестами» (индекс 1 из 3) → первое свободное слово пула.
+  G.roll(game, deck, seq(RANDOM_FACE, at(1, 3), 0.1));
   assert.equal(game.turn.face, 'random');
   assert.equal(game.turn.category, 'gestures');
   assert.equal(game.turn.seconds, 60);
@@ -516,14 +520,14 @@ test('слова пула не повторяются, после исчерпа
   const deck = withPool(['Раз', 'Два']);
   const got = [];
   for (let i = 0; i < 2; i += 1) {
-    G.roll(game, deck, seq(RANDOM_FACE, at(1, 3), Math.random()));
+    G.roll(game, deck, seq(RANDOM_FACE, at(0, 3), Math.random()));
     assert.equal(game.turn.fromPool, true);
     got.push(game.turn.card);
     G.adminCancelTurn(game);
   }
   assert.deepEqual(got.sort(), ['Два', 'Раз']);
   assert.equal(G.remainingCards(game, deck).random, 0);
-  G.roll(game, deck, seq(RANDOM_FACE, at(1, 3), 0.1));
+  G.roll(game, deck, seq(RANDOM_FACE, at(0, 3), 0.1));
   assert.equal(game.turn.fromPool, false);
   assert.equal(game.turn.poolFallback, true);
   assert.ok(cards.talk.includes(game.turn.card));
@@ -531,7 +535,7 @@ test('слова пула не повторяются, после исчерпа
 
 test('пустой пул: «?» работает по-старому, без пометки', () => {
   const game = setup(1);
-  G.roll(game, withPool([]), seq(RANDOM_FACE, at(1, 3), 0.1));
+  G.roll(game, withPool([]), seq(RANDOM_FACE, at(0, 3), 0.1));
   assert.equal(game.turn.fromPool, false);
   assert.equal(game.turn.poolFallback, false);
   assert.ok(cards.talk.includes(game.turn.card));
@@ -549,9 +553,9 @@ test('обычные грани кубика не берут слова из п�
   assert.equal(G.remainingCards(game, deck).random, 1);
 });
 
-test('если колоды «?»-заданий закончились, «?» не переходит на песни и рисование', () => {
+test('если колоды «?»-заданий закончились, «?» не переходит на «Да / Нет» и песни', () => {
   const game = setup(1);
-  const deck = { ...withPool([]), yesno: ['а'], talk: ['б'], gestures: ['в'] };
+  const deck = { ...withPool([]), talk: ['б'], gestures: ['в'], drawing: ['г'] };
   for (let i = 0; i < 3; i += 1) {
     G.roll(game, deck, seq(RANDOM_FACE, at(i, 3), 0.1));
     G.adminCancelTurn(game);
