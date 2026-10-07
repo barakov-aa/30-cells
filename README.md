@@ -134,12 +134,12 @@ ADMIN_LOGIN=admin ADMIN_PASSWORD=мой-пароль npm start
 
 ## Развёртывание на сервере
 
-Сайт работает на VPS с Ubuntu 22.04/24.04: Node.js 22 + pm2, перед ним nginx с HTTPS на порту 443
+Сайт работает на VPS с Ubuntu 22.04–26.04: Node.js 24 (LTS) + pm2, перед ним nginx с HTTPS на порту 443
 (сертификат Let's Encrypt через certbot).
 
 ```bash
 apt -y install git nginx certbot python3-certbot-nginx curl dnsutils
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt -y install nodejs
+curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt -y install nodejs
 npm install -g pm2
 
 git clone https://github.com/barakov-aa/30-cells.git /opt/game
