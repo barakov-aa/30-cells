@@ -28,25 +28,15 @@
 
   // ---------- Звук и управление экраном ----------
 
-  let audio = null;
-  function beep(freq = 880, duration = 0.5) {
-    if (!soundOn || !audio) return;
-    const osc = audio.createOscillator();
-    const gain = audio.createGain();
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.25, audio.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + duration);
-    osc.connect(gain).connect(audio.destination);
-    osc.start();
-    osc.stop(audio.currentTime + duration);
-  }
+  // Звуки (public/js/sounds.js) на экране включаются кнопкой: браузер разрешает звук только после клика.
+  const Sounds = window.Sounds;
+  Sounds.enabled = false;
 
   $('#btn-sound').addEventListener('click', () => {
     soundOn = !soundOn;
-    if (soundOn && !audio) audio = new (window.AudioContext || window.webkitAudioContext)();
-    audio?.resume();
+    Sounds.enabled = soundOn;
     $('#btn-sound').textContent = soundOn ? '🔊 Звук включён' : '🔇 Включить звук';
-    beep(660, 0.15);
+    Sounds.step(0, 1);
   });
 
   function toggleFullscreen() {
@@ -231,7 +221,9 @@
 
     if (rolling) animateRoll();
     const key = `${turn.id}:${turn.phase}`;
-    if (lastPhaseKey?.endsWith(':timer') && turn.phase === 'result' && lastPhaseKey.startsWith(turn.id)) beep(660, 0.9);
+    // Будильник — только когда время вышло, а не когда команда остановила таймер раньше.
+    if (lastPhaseKey?.endsWith(':timer') && turn.phase === 'result' && lastPhaseKey.startsWith(turn.id)
+      && turn.stoppedAt >= turn.endsAt) Sounds.timeUp();
     lastPhaseKey = key;
     tick();
   }
@@ -264,9 +256,9 @@
     el.classList.toggle('warn', sec <= 10);
     const bar = document.getElementById('timer-bar');
     if (bar) bar.style.width = `${(left / (turn.seconds * 1000)) * 100}%`;
-    if (sec <= 3 && sec > 0 && beeped !== `${turn.id}:${sec}`) {
+    if (sec <= 5 && sec > 0 && beeped !== `${turn.id}:${sec}`) {
       beeped = `${turn.id}:${sec}`;
-      beep(520, 0.15);
+      Sounds.countdown(sec);
     }
   }
   setInterval(tick, 200);
@@ -305,7 +297,7 @@
       if (board.isAnimating()) setTimeout(show, 300);
       else {
         el.classList.remove('hidden');
-        beep(880, 1.2);
+        Sounds.win();
       }
     };
     setTimeout(show, 300);

@@ -199,6 +199,7 @@ window.Board = (() => {
       for (let i = 1; i <= steps; i += 1) {
         shown.set(move.teamId, move.from + dir * i);
         layout();
+        window.Sounds?.step(i - 1, dir);
         p.el.classList.remove('hop');
         void p.el.offsetWidth; // перезапуск анимации прыжка
         p.el.classList.add('hop');

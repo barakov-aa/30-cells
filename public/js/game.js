@@ -100,19 +100,20 @@
     return a && el.contains(a) && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName);
   }
 
-  function beep(freq = 880, duration = 0.5) {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.2, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + duration);
-    } catch { /* звук недоступен */ }
+  // ---------- Звук ----------
+  // Звуки (public/js/sounds.js) включены по умолчанию; кнопка 🔊 в шапке выключает их на этом устройстве.
+  const Sounds = window.Sounds;
+  const soundBtn = $('#sound-toggle');
+  function setSound(on) {
+    Sounds.enabled = on;
+    soundBtn.textContent = on ? '🔊' : '🔇';
+    soundBtn.title = on ? 'Звук включён — нажмите, чтобы выключить' : 'Звук выключен — нажмите, чтобы включить';
+    storage('sound', on ? '1' : '0');
   }
+  setSound(storage('sound') !== '0');
+  soundBtn.addEventListener('click', () => setSound(!Sounds.enabled));
+  // Браузер разрешает звук только после действия пользователя.
+  document.addEventListener('pointerdown', () => Sounds.unlock(), { once: true });
 
   // ---------- Отрисовка ----------
 
@@ -238,7 +239,26 @@
     }
   }
 
+  // Фанфары — когда победитель появился во время игры (не при открытии уже законченной игры)
+  // и только после того, как фишка дошла до финиша.
+  let winSoundFor;
+  function soundWinner() {
+    if (winSoundFor === undefined || !state.winnerTeamId) {
+      winSoundFor = state.winnerTeamId || null;
+      return;
+    }
+    if (winSoundFor === state.winnerTeamId) return;
+    winSoundFor = state.winnerTeamId;
+    const play = () => {
+      if (state.winnerTeamId !== winSoundFor) return;
+      if (board?.isAnimating()) setTimeout(play, 300);
+      else Sounds.win();
+    };
+    setTimeout(play, 300);
+  }
+
   function renderWinner() {
+    soundWinner();
     const winner = state.teams.find((t) => t.id === state.winnerTeamId);
     $('#winner').innerHTML = winner
       ? `<div class="winner-banner"><div class="big">🏆 ${esc(winner.name)}</div>Команда первой дошла до финиша!</div>`
@@ -391,7 +411,9 @@
     el.innerHTML = html;
     lastTurnId = turn?.id || null;
     const phase = turn ? `${turn.id}:${turn.phase}` : 'idle';
-    if (phase !== lastRenderedPhase && turn?.phase === 'result' && lastRenderedPhase?.endsWith(':timer')) beep(660, 0.8);
+    // Будильник — только когда время вышло, а не когда команда остановила таймер раньше.
+    if (phase !== lastRenderedPhase && turn?.phase === 'result' && lastRenderedPhase?.endsWith(':timer')
+      && turn.stoppedAt >= turn.endsAt) Sounds.timeUp();
     lastRenderedPhase = phase;
     tick();
   }
@@ -406,9 +428,9 @@
     timerEl.classList.toggle('warn', sec <= 10);
     const bar = document.getElementById('timer-bar');
     if (bar) bar.style.width = `${(left / (turn.seconds * 1000)) * 100}%`;
-    if (sec <= 3 && sec > 0 && beeped !== `${turn.id}:${sec}`) {
+    if (sec <= 5 && sec > 0 && beeped !== `${turn.id}:${sec}`) {
       beeped = `${turn.id}:${sec}`;
-      beep(520, 0.15);
+      Sounds.countdown(sec);
     }
   }
   setInterval(tick, 200);
