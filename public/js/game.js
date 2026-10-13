@@ -101,16 +101,17 @@
   }
 
   // ---------- Звук ----------
-  // Звуки (public/js/sounds.js) включены по умолчанию; кнопка 🔊 в шапке выключает их на этом устройстве.
+  // Звуки (public/js/sounds.js) у игроков и ведущего выключены по умолчанию — играет общий экран;
+  // кнопка 🔇/🔊 в шапке включает их на этом устройстве.
   const Sounds = window.Sounds;
   const soundBtn = $('#sound-toggle');
   function setSound(on) {
     Sounds.enabled = on;
     soundBtn.textContent = on ? '🔊' : '🔇';
     soundBtn.title = on ? 'Звук включён — нажмите, чтобы выключить' : 'Звук выключен — нажмите, чтобы включить';
-    storage('sound', on ? '1' : '0');
+    storage('sound-on', on ? '1' : null);
   }
-  setSound(storage('sound') !== '0');
+  setSound(storage('sound-on') === '1');
   soundBtn.addEventListener('click', () => setSound(!Sounds.enabled));
   // Браузер разрешает звук только после действия пользователя.
   document.addEventListener('pointerdown', () => Sounds.unlock(), { once: true });

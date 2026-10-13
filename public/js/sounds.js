@@ -84,6 +84,8 @@ window.Sounds = (() => {
   return {
     /** Разрешить звук: вызывать из обработчика клика. */
     unlock() { try { ac(); } catch { /* звук недоступен */ } },
+    /** Звук включён, но браузер ещё не разрешил его (страницу ни разу не кликали). */
+    get blocked() { return Boolean(enabled && (!ctx || ctx.state !== 'running')); },
     get enabled() { return enabled; },
     set enabled(value) { enabled = Boolean(value); if (enabled) this.unlock(); },
 

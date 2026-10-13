@@ -1,7 +1,7 @@
 'use strict';
 
 (() => {
-  const { esc, api, formatCode, pointsText } = window.App;
+  const { esc, api, formatCode, pointsText, storage } = window.App;
   const $ = (sel) => document.querySelector(sel);
   const screenCode = decodeURIComponent(location.pathname.split('/')[2] || '');
 
@@ -12,7 +12,6 @@
   let seenTurnId = null;
   let rollingUntil = 0;
   let lastPhaseKey = null;
-  let soundOn = false;
   let beeped = null;
 
   const now = () => Date.now() + clockOffset;
@@ -28,15 +27,33 @@
 
   // ---------- Звук и управление экраном ----------
 
-  // Звуки (public/js/sounds.js) на экране включаются кнопкой: браузер разрешает звук только после клика.
+  // Звуки (public/js/sounds.js) на общем экране включены по умолчанию. Браузер разрешает звук только
+  // после действия на странице, поэтому до первого клика или нажатия клавиши кнопка просит разрешить звук.
   const Sounds = window.Sounds;
-  Sounds.enabled = false;
+  let soundOn = storage('screen-sound') !== '0';
+  Sounds.enabled = soundOn;
+
+  function renderSoundBtn() {
+    const btn = $('#btn-sound');
+    if (!soundOn) btn.textContent = '🔇 Включить звук';
+    else if (Sounds.blocked) btn.textContent = '🔈 Нажмите, чтобы разрешить звук';
+    else btn.textContent = '🔊 Звук включён';
+  }
+  const allowSound = () => {
+    Sounds.unlock();
+    setTimeout(renderSoundBtn, 150);
+  };
+  document.addEventListener('pointerdown', allowSound);
+  document.addEventListener('keydown', allowSound);
+  setTimeout(renderSoundBtn, 300);
 
   $('#btn-sound').addEventListener('click', () => {
+    if (soundOn && Sounds.blocked) return; // это нажатие только разрешило звук
     soundOn = !soundOn;
+    storage('screen-sound', soundOn ? '1' : '0');
     Sounds.enabled = soundOn;
-    $('#btn-sound').textContent = soundOn ? '🔊 Звук включён' : '🔇 Включить звук';
-    Sounds.step(0, 1);
+    renderSoundBtn();
+    if (soundOn) Sounds.step(0, 1);
   });
 
   function toggleFullscreen() {
@@ -53,7 +70,8 @@
   function wake() {
     document.body.classList.remove('idle');
     clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => document.body.classList.add('idle'), 3000);
+    // Пока браузер не разрешил звук, кнопки не прячем — иначе подсказку «Нажмите, чтобы разрешить звук» не увидят.
+    idleTimer = setTimeout(() => (Sounds.blocked ? wake() : document.body.classList.add('idle')), 3000);
   }
   document.addEventListener('mousemove', wake);
   wake();
