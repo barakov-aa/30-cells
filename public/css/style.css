@@ -575,3 +575,10 @@ label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 
 .code-input::placeholder { color: var(--border); }
 .join-code { font-size: 1.6rem; font-weight: 900; letter-spacing: 0.12em; font-variant-numeric: tabular-nums; }
 .join-code.small-code { font-size: 1.05rem; white-space: nowrap; }
+
+/* Ускорение, включённое ведущим. */
+.boost-banner {
+  margin: 0 0 10px; padding: 6px 10px; border-radius: 10px; font-weight: 800; text-align: center;
+  background: linear-gradient(135deg, #ffe066, #fab005); color: #5c3d00;
+}
+button.boost-on { background: linear-gradient(135deg, #ffe066, #fab005); color: #5c3d00; border-color: #f59f00; font-weight: 800; }

@@ -586,3 +586,49 @@ test('введённый код очищается от пробелов и де
   assert.equal(G.normalizeJoinCode('B4XW2T5M'), 'b4xw2t5m');
   assert.equal(G.normalizeJoinCode(undefined), '');
 });
+
+test('ускорение: баллы за правильный ответ ×2, провал без удвоения — 0', () => {
+  const game = setup();
+  G.adminSetBoost(game, true);
+  const res = playTurn(game, 'yesno', { success: true });
+  assert.equal(res.delta, 6);
+  assert.equal(res.boosted, true);
+  assert.equal(game.teams[0].position, 7);
+  const miss = playTurn(game, 'talk', { success: false });
+  assert.equal(miss.delta, 0);
+  assert.equal(miss.boosted, false);
+});
+
+test('ускорение с удвоением: успех ×4, провал — обычный штраф ×2', () => {
+  const game = setup(1);
+  G.adminSetBoost(game, true);
+  assert.equal(playTurn(game, 'gestures', { success: true }, { doubled: true }).delta, 8);
+  assert.equal(game.teams[0].position, 9);
+  assert.equal(playTurn(game, 'gestures', { success: false }, { doubled: true }).delta, -4);
+  assert.equal(game.teams[0].position, 5);
+});
+
+test('ускорение на «Кино»: 2 балла за каждый угаданный фильм', () => {
+  const game = setup();
+  G.adminSetBoost(game, true);
+  game.teams[0].position = 10;
+  G.roll(game, cards);
+  G.startTimer(game);
+  G.stopTimer(game);
+  assert.equal(G.resolve(game, { guessed: 3 }).delta, 6);
+  assert.equal(game.teams[0].position, 16);
+});
+
+test('ускорение можно выключить, сброс игры его выключает', () => {
+  const game = setup();
+  G.adminSetBoost(game, true);
+  G.adminSetBoost(game, false);
+  assert.equal(playTurn(game, 'yesno', { success: true }).delta, 3);
+  G.adminSetBoost(game, true);
+  assert.equal(G.pointsMultiplier(game), 2);
+  G.resetGame(game);
+  assert.equal(G.pointsMultiplier(game), 1);
+  const logs = game.log.map((e) => e.text).join('\n');
+  assert.match(logs, /включил ускорение/);
+  assert.match(logs, /выключил ускорение/);
+});

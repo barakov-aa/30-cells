@@ -1,7 +1,7 @@
 'use strict';
 
 (() => {
-  const { esc, api, toast, copy, storage, formatCode, STATUS } = window.App;
+  const { esc, api, toast, copy, storage, formatCode, pointsText, STATUS } = window.App;
   const $ = (sel) => document.querySelector(sel);
 
   const adminMatch = location.pathname.match(/^\/admin\/game\/([^/]+)/);
@@ -277,7 +277,7 @@
     if (turn.substitutedFrom) {
       faceNote += `<div class="muted small">В категории «${esc(cat(turn.substitutedFrom).title)}» закончились карточки — задание заменено</div>`;
     }
-    const pts = turn.kind === 'movie' ? '1 балл за каждый фильм' : `${c.points} ${plural(c.points, 'балл', 'балла', 'баллов')}`;
+    const pts = pointsText(turn, c, boostMultiplier());
     const roles = turn.explainerId
       ? `<div class="small">Объясняет: <b>${esc(playerName(turn.explainerId))}</b>${turn.guesserId ? ` · угадывает: <b>${esc(playerName(turn.guesserId))}</b>` : ''}</div>`
       : '';
@@ -290,6 +290,9 @@
       ${trapHtml(turn)}
       ${roles}`;
   }
+
+  const boostMultiplier = () => (state.boost ? config.boostMultiplier : 1);
+  const boostBanner = () => `<div class="boost-banner">⚡ Ускорение: баллы за правильные ответы ×${config.boostMultiplier}</div>`;
 
   function trapHtml(turn) {
     if (!turn.trap) return '';
@@ -340,7 +343,7 @@
         if (active && team.doubles > 0) {
           doubleHtml = `<label class="double-toggle ${turn.doubled ? 'on' : ''}">
               <input type="checkbox" data-act="double" ${turn.doubled ? 'checked' : ''}>
-              <span>Использовать «Удвоение» (осталось ${team.doubles}): успех +${c.points * 2}, провал −${c.points * 2}</span>
+              <span>Использовать «Удвоение» (осталось ${team.doubles}): успех +${c.points * 2 * boostMultiplier()}, провал −${c.points * 2}</span>
             </label>`;
         } else if (team.doubles <= 0) {
           doubleHtml = '<p class="muted small">Фишки «Удвоение» закончились</p>';
@@ -384,6 +387,7 @@
         ${cardHtml(turn)}
         ${buttons}`;
     }
+    if (state.boost) html = `${boostBanner()}${html}`;
     el.innerHTML = html;
     lastTurnId = turn?.id || null;
     const phase = turn ? `${turn.id}:${turn.phase}` : 'idle';
@@ -498,6 +502,8 @@
       <div class="row">
         ${state.status !== 'playing' ? `<button class="primary" data-act="start-game">▶ ${state.status === 'finished' ? 'Продолжить игру' : 'Начать игру'}</button>` : ''}
         ${playing ? '<button data-act="skip">⏭ Пропустить ход</button>' : ''}
+        ${state.status !== 'finished' ? `<button data-act="toggle-boost" class="${state.boost ? 'boost-on' : ''}"
+          title="Если игра затянулась: баллы за правильные ответы ×${config.boostMultiplier}. Нажмите ещё раз, чтобы выключить">⚡ Ускорение ×${config.boostMultiplier}: ${state.boost ? 'вкл' : 'выкл'}</button>` : ''}
         ${playing && state.turn ? '<button data-act="cancel-turn">↩ Отменить бросок</button>' : ''}
         <button data-act="undo" ${state.undo ? '' : 'disabled'} title="${esc(state.undo ? `Отменить: ${state.undo.label}` : '')}">⎌ Отменить${state.undo ? ` (${state.undo.count})` : ''}</button>
       </div>
@@ -605,6 +611,7 @@
         if (confirm(`Пропустить ход команды «${currentTeam()?.name}»?`)) send('skipTurn');
         return undefined;
       case 'cancel-turn': return send('cancelTurn');
+      case 'toggle-boost': return send('setBoost', { on: !state.boost });
       case 'undo': return send('undo');
       case 'finish-game':
         if (confirm('Завершить игру без победителя?')) send('finishGame');

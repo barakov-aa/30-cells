@@ -146,9 +146,10 @@ window.Board = (() => {
     function reasonText(move) {
       const t = lastTurn;
       if (!t || t.teamId !== move.teamId || t.from !== move.from || t.to !== move.to) return '';
-      if (t.kind === 'movie') return `🎬 Угадано фильмов: ${t.guessed}`;
-      if (t.doubled) return t.success ? '✖2 Удвоение сработало!' : '✖2 Удвоение не удалось — назад';
-      return t.success ? '✓ Задание выполнено' : '';
+      const boost = t.boosted ? ' · ⚡ ускорение' : '';
+      if (t.kind === 'movie') return `🎬 Угадано фильмов: ${t.guessed}${boost}`;
+      if (t.doubled) return t.success ? `✖2 Удвоение сработало!${boost}` : '✖2 Удвоение не удалось — назад';
+      return t.success ? `✓ Задание выполнено${boost}` : '';
     }
 
     function showBanner(move, team) {

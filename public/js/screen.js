@@ -1,7 +1,7 @@
 'use strict';
 
 (() => {
-  const { esc, api, formatCode } = window.App;
+  const { esc, api, formatCode, pointsText } = window.App;
   const $ = (sel) => document.querySelector(sel);
   const screenCode = decodeURIComponent(location.pathname.split('/')[2] || '');
 
@@ -17,13 +17,6 @@
 
   const now = () => Date.now() + clockOffset;
   const cat = (key) => config.categories[key];
-  const plural = (n, one, few, many) => {
-    const m10 = n % 10;
-    const m100 = n % 100;
-    if (m10 === 1 && m100 !== 11) return one;
-    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
-    return many;
-  };
   const playerName = (id) => (id && state.players[id] ? state.players[id].name : '');
   const teamTitle = (t) => `<div class="st-team"><span class="dot" style="background:${esc(t.color)}"></span>${esc(t.name)}</div>`;
 
@@ -165,6 +158,8 @@
     </div>`;
   }
 
+  const boostNote = () => (state.boost ? `<div class="st-boost">⚡ Ускорение: баллы ×${config.boostMultiplier}</div>` : '');
+
   function renderTurn(team) {
     const el = $('#turn');
     const turn = state.turn;
@@ -190,6 +185,7 @@
       el.innerHTML = `<div class="st-small">Ход ${state.turnNumber + 1}</div>
         ${teamTitle(team)}
         <div class="die">${movie ? '🎬' : '🎲'}</div>
+        ${boostNote()}
         <div class="st-meta">${movie ? 'Клетка «Кино» — тянет карточку с фильмами' : 'Бросает кубик…'}</div>`;
       lastPhaseKey = null;
       return;
@@ -197,7 +193,7 @@
 
     const c = cat(turn.category);
     const rolling = Date.now() < rollingUntil;
-    const pts = turn.kind === 'movie' ? '1 балл за каждый фильм' : `${c.points} ${plural(c.points, 'балл', 'балла', 'баллов')}`;
+    const pts = pointsText(turn, c, state.boost ? config.boostMultiplier : 1);
     const roles = turn.explainerId
       ? `<div class="st-roles">Объясняет <b>${esc(playerName(turn.explainerId))}</b>${turn.guesserId ? ` · угадывает <b>${esc(playerName(turn.guesserId))}</b>` : ''}</div>`
       : '';
@@ -231,7 +227,7 @@
     }
     el.innerHTML = `${teamTitle(team)}
       <div class="die ${rolling ? 'rolling-loop' : ''}" id="die">${rolling ? '🎲' : esc(dieIcon(turn))}</div>
-      ${body}`;
+      ${body}${boostNote()}`;
 
     if (rolling) animateRoll();
     const key = `${turn.id}:${turn.phase}`;

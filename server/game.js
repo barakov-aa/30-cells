@@ -370,6 +370,7 @@ function resetGame(game) {
   delete game.usedWords;
   game.usedCardKeys = [];
   game.usedComplications = [];
+  game.boost = false;
   log(game, 'Игра сброшена, все фишки на старте, ловушки расставлены заново');
 }
 
@@ -685,16 +686,21 @@ function expireTimer(game, now = Date.now()) {
 }
 
 /** Подсчёт перемещения за ход. Возвращает изменение позиции и счёта. */
-function computeDelta(turn, result) {
+// Ускорение (включает ведущий, если игра затянулась): баллы за правильные ответы ×2.
+// Штраф за неудачное удвоение не растёт — иначе игра, наоборот, затянулась бы.
+const BOOST_MULTIPLIER = 2;
+const pointsMultiplier = (game) => (game.boost ? BOOST_MULTIPLIER : 1);
+
+function computeDelta(turn, result, multiplier = 1) {
   const cat = CATEGORIES[turn.category];
   if (turn.kind === 'movie') {
     const guessed = Math.max(0, Math.min(MOVIE_TITLES_PER_CARD, Math.floor(Number(result.guessed) || 0)));
-    return { delta: guessed * cat.points, guessed, success: guessed > 0 };
+    return { delta: guessed * cat.points * multiplier, guessed, success: guessed > 0 };
   }
   const success = Boolean(result.success);
   const base = cat.points;
-  if (turn.doubled) return { delta: success ? base * 2 : -base * 2, success };
-  return { delta: success ? base : 0, success };
+  if (turn.doubled) return { delta: success ? base * 2 * multiplier : -base * 2, success };
+  return { delta: success ? base * multiplier : 0, success };
 }
 
 function advanceTurn(game) {
@@ -710,7 +716,8 @@ function resolve(game, result) {
   const turn = game.turn;
   const team = findTeam(game, turn.teamId);
   snapshot(game, `ход команды «${team.name}»`);
-  const { delta, success, guessed } = computeDelta(turn, result || {});
+  const multiplier = pointsMultiplier(game);
+  const { delta, success, guessed } = computeDelta(turn, result || {}, multiplier);
   const from = team.position;
   team.position = clampCell(from + delta);
 
@@ -725,7 +732,8 @@ function resolve(game, result) {
   } else {
     text = `«${team.name}» не справились (${cat.title}): 0`;
   }
-  log(game, `${text} — клетка ${from} → ${team.position}`);
+  const boosted = multiplier > 1 && delta > 0;
+  log(game, `${text}${boosted ? ` (⚡ ускорение ×${multiplier})` : ''} — клетка ${from} → ${team.position}`);
 
   const lastTurn = {
     id: turn.id,
@@ -738,6 +746,7 @@ function resolve(game, result) {
     kind: turn.kind,
     category: turn.category,
     doubled: turn.doubled,
+    boosted,
   };
   if (team.position >= BOARD_SIZE) {
     game.status = 'finished';
@@ -753,6 +762,15 @@ function resolve(game, result) {
 }
 
 // ---------- Управление администратора ----------
+
+function adminSetBoost(game, on) {
+  const value = Boolean(on);
+  if (Boolean(game.boost) === value) return;
+  game.boost = value;
+  log(game, value
+    ? `⚡ Ведущий включил ускорение: баллы за правильные ответы ×${BOOST_MULTIPLIER}`
+    : '⚡ Ведущий выключил ускорение: баллы снова обычные');
+}
 
 function adminSetTeam(game, teamId, fields) {
   const team = findTeam(game, teamId);
@@ -844,6 +862,9 @@ module.exports = {
   CATEGORIES,
   TASK_CATEGORIES,
   RANDOM_TASKS,
+  BOOST_MULTIPLIER,
+  adminSetBoost,
+  pointsMultiplier,
   GUEST_POOL,
   GUEST_POOL_INFO,
   DIE_FACES,
