@@ -11,7 +11,10 @@ const crypto = require('crypto');
 const BOARD_SIZE = 30;
 const START_CELL = 1;
 const MOVIE_CELLS = [10, 21];
-const MAX_TEAM_SIZE = 2;
+// В команде 2 или 3 игрока. В каждом ходе играют двое — один объясняет, другой угадывает,
+// третий (если есть) ждёт, поэтому у команд разного размера равные условия.
+const MIN_TEAM_SIZE = 2;
+const MAX_TEAM_SIZE = 3;
 const DOUBLES_PER_TEAM = 3;
 const MOVIE_TITLES_PER_CARD = 5;
 const TRAP_MIN_CELL = 10;
@@ -247,7 +250,7 @@ function joinTeam(game, playerId, teamId) {
   const player = findPlayer(game, playerId);
   const team = findTeam(game, teamId);
   if (player.teamId === team.id) return team;
-  if (team.players.length >= MAX_TEAM_SIZE) fail('В команде уже 2 игрока');
+  if (team.players.length >= MAX_TEAM_SIZE) fail(`В команде уже ${MAX_TEAM_SIZE} игрока`);
   if (game.turn && player.teamId && game.teams[game.currentTeamIdx]?.id === player.teamId) {
     fail('Нельзя сменить команду во время её хода');
   }
@@ -345,7 +348,7 @@ function startGame(game) {
   game.turn = null;
   game.turnNumber = 0;
   ensureTraps(game);
-  const incomplete = game.teams.filter((t) => t.players.length < MAX_TEAM_SIZE);
+  const incomplete = game.teams.filter((t) => t.players.length < MIN_TEAM_SIZE);
   log(game, 'Игра началась!');
   if (incomplete.length) {
     log(game, `Внимание: неполные команды — ${incomplete.map((t) => t.name).join(', ')}`);
@@ -547,12 +550,24 @@ function drawCard(game, category, cards, rng) {
   return Array.isArray(card) ? card.slice() : card;
 }
 
+// Роли по кругу: в ход k объясняет игрок k, угадывает следующий за ним, остальные ждут.
+// Команда 1-2-3: «1 → 2», «2 → 3», «3 → 1», снова «1 → 2»; команда 1-2: «1 → 2», «2 → 1».
 function teamRoles(game, team) {
   const players = team.players.filter((id) => game.players[id]);
-  if (players.length === 0) return { explainerId: null, guesserId: null };
-  const explainerId = players[team.turnsTaken % players.length];
-  const guesserId = players.find((id) => id !== explainerId) || null;
-  return { explainerId, guesserId };
+  if (players.length === 0) return { explainerId: null, guesserId: null, waitingIds: [] };
+  const k = team.turnsTaken % players.length;
+  const explainerId = players[k];
+  const guesserId = players.length > 1 ? players[(k + 1) % players.length] : null;
+  const waitingIds = players.filter((id) => id !== explainerId && id !== guesserId);
+  return { explainerId, guesserId, waitingIds };
+}
+
+// Карточку видят объясняющий, соперники и зрители; угадывающий и ждущий игрок ходящей команды — нет.
+function seesCard(game, playerId) {
+  const turn = game.turn;
+  if (!turn || !playerId) return true;
+  if (playerId === turn.explainerId) return true;
+  return playerId !== turn.guesserId && !(turn.waitingIds || []).includes(playerId);
 }
 
 /** Бросок кубика или вытягивание карточки «Кино» на клетках 10 и 21. */
@@ -614,6 +629,7 @@ function roll(game, cards, rng = Math.random, complications = {}) {
     endsAt: null,
     explainerId: roles.explainerId,
     guesserId: roles.guesserId,
+    waitingIds: roles.waitingIds,
     strokes: [],
     substitutedFrom,
     movieFallback,
@@ -688,6 +704,7 @@ function expireTimer(game, now = Date.now()) {
 /** Подсчёт перемещения за ход. Возвращает изменение позиции и счёта. */
 // Ускорение (включает ведущий, если игра затянулась): баллы за правильные ответы ×2.
 // Штраф за неудачное удвоение не растёт — иначе игра, наоборот, затянулась бы.
+// На карточку «Кино» ускорение не действует, как и фишка «Удвоение».
 const BOOST_MULTIPLIER = 2;
 const pointsMultiplier = (game) => (game.boost ? BOOST_MULTIPLIER : 1);
 
@@ -695,7 +712,7 @@ function computeDelta(turn, result, multiplier = 1) {
   const cat = CATEGORIES[turn.category];
   if (turn.kind === 'movie') {
     const guessed = Math.max(0, Math.min(MOVIE_TITLES_PER_CARD, Math.floor(Number(result.guessed) || 0)));
-    return { delta: guessed * cat.points * multiplier, guessed, success: guessed > 0 };
+    return { delta: guessed * cat.points, guessed, success: guessed > 0 };
   }
   const success = Boolean(result.success);
   const base = cat.points;
@@ -716,7 +733,7 @@ function resolve(game, result) {
   const turn = game.turn;
   const team = findTeam(game, turn.teamId);
   snapshot(game, `ход команды «${team.name}»`);
-  const multiplier = pointsMultiplier(game);
+  const multiplier = turn.kind === 'movie' ? 1 : pointsMultiplier(game);
   const { delta, success, guessed } = computeDelta(turn, result || {}, multiplier);
   const from = team.position;
   team.position = clampCell(from + delta);
@@ -857,6 +874,8 @@ module.exports = {
   START_CELL,
   MOVIE_CELLS,
   MAX_TEAM_SIZE,
+  MIN_TEAM_SIZE,
+  seesCard,
   DOUBLES_PER_TEAM,
   MOVIE_TITLES_PER_CARD,
   CATEGORIES,

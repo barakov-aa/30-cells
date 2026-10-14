@@ -274,6 +274,7 @@ app.get('/api/config', (req, res) => {
     trapCells: [G.TRAP_MIN_CELL, G.TRAP_MAX_CELL],
     movieCells: G.MOVIE_CELLS,
     maxTeamSize: G.MAX_TEAM_SIZE,
+    minTeamSize: G.MIN_TEAM_SIZE,
     doublesPerTeam: G.DOUBLES_PER_TEAM,
     boostMultiplier: G.BOOST_MULTIPLIER,
     categories: G.CATEGORIES,
@@ -332,7 +333,7 @@ function viewFor(game, viewer) {
     const { strokes, ...rest } = game.turn;
     turn = { ...rest, strokeCount: strokes.length };
     // Общий экран видят все, в том числе угадывающие, поэтому карточку на нём не показываем.
-    const hideCard = viewer.screen || (!viewer.admin && viewer.playerId && viewer.playerId === game.turn.guesserId);
+    const hideCard = viewer.screen || (!viewer.admin && viewer.playerId && !G.seesCard(game, viewer.playerId));
     if (hideCard) {
       turn.card = null;
       turn.cardHidden = true;

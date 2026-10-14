@@ -63,7 +63,7 @@
           <div class="row"><span class="title">${esc(g.name)}</span><span class="badge ${esc(g.status)}">${STATUS[g.status]}</span></div>
           <div class="muted small">${new Date(g.createdAt).toLocaleString('ru-RU')} · игроков: ${g.players}${g.winner ? ` · 🏆 ${esc(g.winner)}` : ''}</div>
           <div class="row small" style="margin-top: 4px">
-            ${g.teams.map((t) => `<span class="row" style="gap: 4px"><span class="dot" style="background:${esc(t.color)}"></span>${esc(t.name)} (${t.players}/2) — ${t.position}</span>`).join('') || '<span class="muted">Команд нет</span>'}
+            ${g.teams.map((t) => `<span class="row" style="gap: 4px"><span class="dot" style="background:${esc(t.color)}"></span>${esc(t.name)} (${t.players} чел.) — ${t.position}</span>`).join('') || '<span class="muted">Команд нет</span>'}
           </div>
           <div class="row" style="margin-top: 6px"><span class="join-code small-code">${esc(formatCode(g.code))}</span>
             <div class="invite" style="flex: 1">${esc(inviteUrl(g.code))}</div></div>

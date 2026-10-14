@@ -64,8 +64,9 @@ window.App = (() => {
   }
 
   // Баллы за задание с учётом ускорения, которое может включить ведущий («6 баллов», «2 балла за каждый фильм»).
-  function pointsText(turn, category, multiplier = 1) {
-    const n = turn.kind === 'movie' ? multiplier : category.points * multiplier;
+  function pointsText(turn, category, boost = 1) {
+    const multiplier = turn.kind === 'movie' ? 1 : boost; // на «Кино» ускорение не действует
+    const n = turn.kind === 'movie' ? category.points : category.points * multiplier;
     const m10 = n % 10;
     const m100 = n % 100;
     const word = m10 === 1 && m100 !== 11 ? 'балл' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'балла' : 'баллов';

@@ -203,7 +203,7 @@
     const rolling = Date.now() < rollingUntil;
     const pts = pointsText(turn, c, state.boost ? config.boostMultiplier : 1);
     const roles = turn.explainerId
-      ? `<div class="st-roles">Объясняет <b>${esc(playerName(turn.explainerId))}</b>${turn.guesserId ? ` · угадывает <b>${esc(playerName(turn.guesserId))}</b>` : ''}</div>`
+      ? `<div class="st-roles">Объясняет <b>${esc(playerName(turn.explainerId))}</b>${turn.guesserId ? ` · угадывает <b>${esc(playerName(turn.guesserId))}</b>` : ''}${(turn.waitingIds || []).length ? ` · ждёт ${turn.waitingIds.map((id) => esc(playerName(id))).join(', ')}` : ''}</div>`
       : '';
     const double = turn.doubled ? '<div><span class="st-double">✖2 Удвоение</span></div>' : '';
 

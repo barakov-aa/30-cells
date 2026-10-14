@@ -35,18 +35,19 @@ function playTurn(game, face, result, { doubled = false } = {}) {
   return G.resolve(game, result);
 }
 
-test('команды получают разные цвета и не больше 2 игроков', () => {
+test('команды получают разные цвета и не больше 3 игроков', () => {
   const game = G.createGame('x');
   const t1 = G.createTeam(game, '');
   const t2 = G.createTeam(game, '');
   assert.notEqual(t1.color, t2.color);
   assert.equal(t1.name, 'Красные');
-  const players = ['А', 'Б', 'В'].map((n) => G.addPlayer(game, n));
+  const players = ['А', 'Б', 'В', 'Г'].map((n) => G.addPlayer(game, n));
   G.joinTeam(game, players[0].id, t1.id);
   G.joinTeam(game, players[1].id, t1.id);
-  assert.throws(() => G.joinTeam(game, players[2].id, t1.id), /2 игрока/);
+  G.joinTeam(game, players[2].id, t1.id);
+  assert.throws(() => G.joinTeam(game, players[3].id, t1.id), /3 игрока/);
   G.joinTeam(game, players[1].id, t2.id);
-  assert.deepEqual(t1.players, [players[0].id]);
+  assert.deepEqual(t1.players, [players[0].id, players[2].id]);
   assert.deepEqual(t2.players, [players[1].id]);
 });
 
@@ -608,15 +609,17 @@ test('ускорение с удвоением: успех ×4, провал —
   assert.equal(game.teams[0].position, 5);
 });
 
-test('ускорение на «Кино»: 2 балла за каждый угаданный фильм', () => {
+test('ускорение на «Кино» не действует: 1 балл за каждый угаданный фильм', () => {
   const game = setup();
   G.adminSetBoost(game, true);
   game.teams[0].position = 10;
   G.roll(game, cards);
   G.startTimer(game);
   G.stopTimer(game);
-  assert.equal(G.resolve(game, { guessed: 3 }).delta, 6);
-  assert.equal(game.teams[0].position, 16);
+  const res = G.resolve(game, { guessed: 3 });
+  assert.equal(res.delta, 3);
+  assert.equal(res.boosted, false);
+  assert.equal(game.teams[0].position, 13);
 });
 
 test('ускорение можно выключить, сброс игры его выключает', () => {
@@ -631,4 +634,65 @@ test('ускорение можно выключить, сброс игры ег
   const logs = game.log.map((e) => e.text).join('\n');
   assert.match(logs, /включил ускорение/);
   assert.match(logs, /выключил ускорение/);
+});
+
+test('команда из трёх: роли по кругу 1→2, 2→3, 3→1, третий ждёт', () => {
+  const game = G.createGame('Тест');
+  const team = G.createTeam(game, 'Тройка');
+  const [p1, p2, p3] = ['Аня', 'Боря', 'Вика'].map((n) => G.addPlayer(game, n));
+  [p1, p2, p3].forEach((p) => G.joinTeam(game, p.id, team.id));
+  G.startGame(game);
+  const seen = [];
+  for (let i = 0; i < 4; i += 1) {
+    G.roll(game, cards, seq(at(0, 6), 0.1, 0.1));
+    const { explainerId, guesserId, waitingIds } = game.turn;
+    const name = (id) => game.players[id].name;
+    seen.push(`${name(explainerId)}→${name(guesserId)} (${waitingIds.map(name).join()})`);
+    G.adminSkipTurn(game);
+  }
+  assert.deepEqual(seen, ['Аня→Боря (Вика)', 'Боря→Вика (Аня)', 'Вика→Аня (Боря)', 'Аня→Боря (Вика)']);
+});
+
+test('команда из двух: роли чередуются, ждущих нет', () => {
+  const game = setup(1);
+  const names = [];
+  for (let i = 0; i < 3; i += 1) {
+    G.roll(game, cards, seq(at(0, 6), 0.1, 0.1));
+    assert.deepEqual(game.turn.waitingIds, []);
+    names.push(`${game.players[game.turn.explainerId].name}→${game.players[game.turn.guesserId].name}`);
+    G.adminSkipTurn(game);
+  }
+  assert.equal(names[0], names[2]);
+  assert.notEqual(names[0], names[1]);
+});
+
+test('карточку видит объясняющий и соперники, но не угадывающий и не ждущий', () => {
+  const game = G.createGame('Тест');
+  const a = G.createTeam(game, 'А');
+  const b = G.createTeam(game, 'Б');
+  const [p1, p2, p3, q1, q2] = ['1', '2', '3', 'q1', 'q2'].map((n) => G.addPlayer(game, n));
+  [p1, p2, p3].forEach((p) => G.joinTeam(game, p.id, a.id));
+  [q1, q2].forEach((p) => G.joinTeam(game, p.id, b.id));
+  G.startGame(game);
+  G.roll(game, cards, seq(at(0, 6), 0.1, 0.1));
+  assert.equal(G.seesCard(game, p1.id), true);
+  assert.equal(G.seesCard(game, p2.id), false);
+  assert.equal(G.seesCard(game, p3.id), false);
+  assert.equal(G.seesCard(game, q1.id), true);
+  assert.equal(G.seesCard(game, q2.id), true);
+});
+
+test('неполной при старте считается только команда меньше чем из 2 игроков', () => {
+  const game = G.createGame('Тест');
+  const a = G.createTeam(game, 'Пара');
+  const b = G.createTeam(game, 'Тройка');
+  const c = G.createTeam(game, 'Один');
+  const ps = ['1', '2', '3', '4', '5', '6'].map((n) => G.addPlayer(game, n));
+  G.joinTeam(game, ps[0].id, a.id); G.joinTeam(game, ps[1].id, a.id);
+  G.joinTeam(game, ps[2].id, b.id); G.joinTeam(game, ps[3].id, b.id); G.joinTeam(game, ps[4].id, b.id);
+  G.joinTeam(game, ps[5].id, c.id);
+  G.startGame(game);
+  const warn = game.log.map((e) => e.text).find((t) => t.includes('неполные'));
+  assert.match(warn, /Один/);
+  assert.doesNotMatch(warn, /Пара|Тройка/);
 });

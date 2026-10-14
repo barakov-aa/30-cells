@@ -274,6 +274,9 @@
 
   function cardHtml(turn) {
     if (turn.cardHidden) {
+      if ((turn.waitingIds || []).includes(state.me?.playerId)) {
+        return '<div class="secret hidden-card">⏳ В этот ход вы ждёте: играют объясняющий и угадывающий. Ваша очередь — в следующих ходах</div>';
+      }
       return '<div class="secret hidden-card">🙈 Карточку видит только объясняющий — угадывайте!</div>';
     }
     if (turn.kind === 'movie') {
@@ -300,7 +303,7 @@
     }
     const pts = pointsText(turn, c, boostMultiplier());
     const roles = turn.explainerId
-      ? `<div class="small">Объясняет: <b>${esc(playerName(turn.explainerId))}</b>${turn.guesserId ? ` · угадывает: <b>${esc(playerName(turn.guesserId))}</b>` : ''}</div>`
+      ? `<div class="small">Объясняет: <b>${esc(playerName(turn.explainerId))}</b>${turn.guesserId ? ` · угадывает: <b>${esc(playerName(turn.guesserId))}</b>` : ''}${(turn.waitingIds || []).length ? ` · ждёт: ${turn.waitingIds.map((id) => esc(playerName(id))).join(', ')}` : ''}</div>`
       : '';
     return `<div>${teamLabel(team)}</div>
       <div class="die ${lastTurnId !== turn.id ? 'rolling' : ''}">${esc(dieFace(turn))}</div>
@@ -459,7 +462,7 @@
     }).join('');
     const allFull = state.teams.length > 0 && !team && state.teams.every((t) => t.players.length >= config.maxTeamSize);
     el.innerHTML = `<h2>${team ? 'Ваша команда' : 'Выберите команду'}</h2>
-      <p class="muted small">В команде ${config.maxTeamSize} человека. Команды создаёт ведущий.</p>
+      <p class="muted small">В команде ${config.minTeamSize}–${config.maxTeamSize} человека. Команды создаёт ведущий.</p>
       <div class="team-pick">${options || '<p class="muted">Команд пока нет — ведущий скоро их создаст, страница обновится сама.</p>'}</div>
       ${allFull ? '<p class="muted small">Все команды заполнены — попросите ведущего добавить команду.</p>' : ''}
       <div class="row" style="margin-top:10px"><button class="link small" data-act="rename-me">✎ Изменить имя</button></div>`;
