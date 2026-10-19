@@ -582,3 +582,35 @@ label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 
   background: linear-gradient(135deg, #ffe066, #fab005); color: #5c3d00;
 }
 button.boost-on { background: linear-gradient(135deg, #ffe066, #fab005); color: #5c3d00; border-color: #f59f00; font-weight: 800; }
+
+/* 3D-кубик (public/js/dice.js): грани квадратные и смыкаются без зазоров, скругление — внутри грани. */
+.dice3d {
+  --s: 84px;
+  position: relative; width: 100%; height: calc(var(--s) * 1.7); margin: 4px auto;
+  display: grid; place-items: center; perspective: 700px;
+  overflow-x: clip; overflow-y: visible; /* в полёте кубик может подпрыгнуть выше, но не расширяет страницу вбок */
+}
+.dice-thrower { position: relative; z-index: 1; width: var(--s); height: var(--s); }
+.dice-cube { width: var(--s); height: var(--s); position: relative; transform-style: preserve-3d; transform: rotateX(-24deg) rotateY(32deg); }
+.dice-f {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: calc(var(--s) * 0.055);
+  background: var(--border); backface-visibility: hidden;
+}
+.dice-tile {
+  width: 100%; height: 100%; display: grid; place-items: center; border-radius: 18%;
+  font-size: calc(var(--s) * 0.42); font-weight: 800; line-height: 1;
+  background: radial-gradient(circle at 35% 30%, var(--cell), var(--surface-2));
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.06);
+}
+.dice-f1 { transform: translateZ(calc(var(--s) / 2)); }
+.dice-f2 { transform: rotateY(90deg) translateZ(calc(var(--s) / 2)); }
+.dice-f3 { transform: rotateY(180deg) translateZ(calc(var(--s) / 2)); }
+.dice-f4 { transform: rotateY(-90deg) translateZ(calc(var(--s) / 2)); }
+.dice-f5 { transform: rotateX(90deg) translateZ(calc(var(--s) / 2)); }
+.dice-f6 { transform: rotateX(-90deg) translateZ(calc(var(--s) / 2)); }
+.dice-shadow {
+  position: absolute; left: 50%; top: calc(50% + var(--s) * 0.55); width: var(--s); height: calc(var(--s) * 0.18);
+  margin-left: calc(var(--s) * -0.5); border-radius: 50%; background: rgba(60, 40, 20, 0.22); filter: blur(4px);
+}
+body.player .turn-card .dice3d { --s: 64px; }
+.die-slot { width: 100%; align-self: stretch; }

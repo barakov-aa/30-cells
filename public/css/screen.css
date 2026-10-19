@@ -112,7 +112,7 @@ body.screen.idle .screen-tools { opacity: 0; pointer-events: none; }
   .screen-side { flex-direction: row; }
   .screen-side > * { flex: 1; overflow: auto; }
 }
-.screen-turn .die.rolling-loop { animation: roll .45s linear infinite; }
+
 
 .screen-turn .st-qr {
   /* QR сжимается, если в колонке не хватает места для таблицы команд. */
@@ -138,3 +138,4 @@ body.screen.idle .screen-tools { opacity: 0; pointer-events: none; }
   display: inline-block; padding: 0.2em 0.8em; border-radius: 99px; font-weight: 800;
   background: linear-gradient(135deg, #ffe066, #fab005); color: #5c3d00;
 }
+.screen-turn .dice3d { --s: 6.2em; margin: 0; }

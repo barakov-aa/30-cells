@@ -11,6 +11,8 @@
   let clockOffset = 0;
   let seenTurnId = null;
   let rollingUntil = 0;
+  let pendingRoll = false;
+  let dice = null;
   let lastPhaseKey = null;
   let beeped = null;
 
@@ -102,7 +104,11 @@
     const turn = s.turn;
     if (turn && turn.id !== seenTurnId) {
       // Анимация броска только для «живого» броска, не при открытии экрана посреди хода.
-      if (!firstState && turn.phase === 'prepare') rollingUntil = Date.now() + 1400;
+      if (!firstState && turn.phase === 'prepare' && turn.kind !== 'movie') {
+        rollingUntil = Date.now() + window.Dice.ROLL_MS;
+        pendingRoll = true;
+        setTimeout(render, window.Dice.ROLL_MS + 50);
+      }
       seenTurnId = turn.id;
     }
     render();
@@ -152,12 +158,6 @@
   }
   window.addEventListener('resize', fitRules);
 
-  function dieIcon(turn) {
-    if (turn.kind === 'movie') return '🎬';
-    if (turn.face === 'random') return '?';
-    return cat(turn.category).icon;
-  }
-
   function trapHtml(turn) {
     if (!turn.trap) return '';
     return `<div class="trap-banner">
@@ -192,9 +192,10 @@
       const movie = config.movieCells.includes(team.position);
       el.innerHTML = `<div class="st-small">Ход ${state.turnNumber + 1}</div>
         ${teamTitle(team)}
-        <div class="die">${movie ? '🎬' : '🎲'}</div>
+        ${movie ? '<div class="die">🎬</div>' : '<div class="die-slot"></div>'}
         ${boostNote()}
         <div class="st-meta">${movie ? 'Клетка «Кино» — тянет карточку с фильмами' : 'Бросает кубик…'}</div>`;
+      mountDice(null);
       lastPhaseKey = null;
       return;
     }
@@ -234,10 +235,10 @@
         ${double}`;
     }
     el.innerHTML = `${teamTitle(team)}
-      <div class="die ${rolling ? 'rolling-loop' : ''}" id="die">${rolling ? '🎲' : esc(dieIcon(turn))}</div>
+      ${turn.kind === 'movie' ? '<div class="die">🎬</div>' : '<div class="die-slot"></div>'}
       ${body}${boostNote()}`;
+    mountDice(turn);
 
-    if (rolling) animateRoll();
     const key = `${turn.id}:${turn.phase}`;
     // Будильник — только когда время вышло, а не когда команда остановила таймер раньше.
     if (lastPhaseKey?.endsWith(':timer') && turn.phase === 'result' && lastPhaseKey.startsWith(turn.id)
@@ -246,22 +247,21 @@
     tick();
   }
 
-  let rollTimer = null;
-  function animateRoll() {
-    if (rollTimer) return;
-    const faces = ['±', '🗣️', '👐', '🎵', '✏️', '?'];
-    let i = 0;
-    rollTimer = setInterval(() => {
-      const die = document.getElementById('die');
-      if (Date.now() >= rollingUntil || !die) {
-        clearInterval(rollTimer);
-        rollTimer = null;
-        render();
-        return;
-      }
-      die.textContent = faces[i % faces.length];
-      i += 1;
-    }, 110);
+  // 3D-кубик (public/js/dice.js) — один на страницу, переставляется в свежую разметку панели.
+  function mountDice(turn) {
+    const slot = document.querySelector('#turn .die-slot');
+    if (!slot) return;
+    if (!dice) dice = window.Dice.create(config.dieFaces.map((f) => (f === 'random' ? '?' : config.categories[f].icon)));
+    dice.mount(slot);
+    if (!turn) {
+      dice.show(null);
+      return;
+    }
+    const face = config.dieFaces.indexOf(turn.face);
+    if (pendingRoll) {
+      pendingRoll = false;
+      dice.roll(face);
+    } else dice.show(face);
   }
 
   function tick() {

@@ -306,7 +306,7 @@
       ? `<div class="small">Объясняет: <b>${esc(playerName(turn.explainerId))}</b>${turn.guesserId ? ` · угадывает: <b>${esc(playerName(turn.guesserId))}</b>` : ''}${(turn.waitingIds || []).length ? ` · ждёт: ${turn.waitingIds.map((id) => esc(playerName(id))).join(', ')}` : ''}</div>`
       : '';
     return `<div>${teamLabel(team)}</div>
-      <div class="die ${lastTurnId !== turn.id ? 'rolling' : ''}">${esc(dieFace(turn))}</div>
+      ${turn.kind === 'movie' ? '<div class="die">🎬</div>' : '<div class="die-slot"></div>'}
       ${faceNote}
       <div class="task-title">${esc(c.icon)} ${esc(c.title)}${turn.doubled ? ' <span class="badge" style="background:#fff3bf;color:#5c3d00">✖2 удвоение</span>' : ''}</div>
       <div class="task-meta">${turn.seconds} сек · ${pts}</div>
@@ -354,7 +354,7 @@
         : '';
       html = `<div class="muted small">Ход ${state.turnNumber + 1}</div>
         <h2 style="margin-top: 4px">Ходит ${teamLabel(team)}</h2>
-        <div class="die">${movie ? '🎬' : '🎲'}</div>
+        ${movie ? '<div class="die">🎬</div>' : '<div class="die-slot"></div>'}
         ${movie ? '<p>Команда стоит на клетке «Кино» — вместо кубика тянет карточку с 5 фильмами.</p>' : ''}
         ${lastNote}
         ${active
@@ -396,7 +396,7 @@
           : '<p class="muted">Команда подсчитывает угаданные фильмы…</p>';
       } else {
         const c = cat(turn.category);
-        const win = turn.doubled ? c.points * 2 : c.points;
+        const win = (turn.doubled ? c.points * 2 : c.points) * boostMultiplier();
         const lose = turn.doubled ? -c.points * 2 : 0;
         buttons = active
           ? `<p><b>Задание выполнено?</b></p>
@@ -413,6 +413,7 @@
     }
     if (state.boost) html = `${boostBanner()}${html}`;
     el.innerHTML = html;
+    mountDice(turn);
     lastTurnId = turn?.id || null;
     const phase = turn ? `${turn.id}:${turn.phase}` : 'idle';
     // Будильник — только когда время вышло, а не когда команда остановила таймер раньше.
@@ -420,6 +421,25 @@
       && turn.stoppedAt >= turn.endsAt) Sounds.timeUp();
     lastRenderedPhase = phase;
     tick();
+  }
+
+  // 3D-кубик (public/js/dice.js): бросок анимируется только для нового хода, увиденного «вживую»,
+  // а не при открытии страницы посреди хода.
+  let dice = null;
+  let diceSeenTurn;
+  function mountDice(turn) {
+    const first = diceSeenTurn === undefined;
+    const isNew = Boolean(!first && turn && turn.id !== diceSeenTurn);
+    diceSeenTurn = turn ? turn.id : null;
+    const slot = document.querySelector('#turn .die-slot');
+    if (!slot) return;
+    if (!dice) dice = window.Dice.create(config.dieFaces.map((f) => (f === 'random' ? '?' : config.categories[f].icon)));
+    dice.mount(slot);
+    if (!turn) return dice.show(null);
+    const face = config.dieFaces.indexOf(turn.face);
+    if (isNew && turn.phase === 'prepare') dice.roll(face);
+    else dice.show(face);
+    return undefined;
   }
 
   function tick() {
