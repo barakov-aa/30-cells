@@ -51,6 +51,7 @@ function load() {
   const list = readJson(GAMES_FILE, []);
   for (const game of list) {
     if (!game.screenCode) game.screenCode = newCode();
+    if (!game.tabletCode) game.tabletCode = newCode();
     ensureTraps(game);
     games.set(game.id, game);
   }
@@ -144,6 +145,7 @@ function resetCards() {
 }
 
 module.exports = {
+  DATA_DIR,
   games,
   load,
   saveNow,
@@ -162,6 +164,7 @@ module.exports = {
   },
   isCodeTaken,
   findByScreenCode: (code) => [...games.values()].find((g) => g.screenCode === code),
+  findByTabletCode: (code) => [...games.values()].find((g) => g.tabletCode === code),
   addGame(game) {
     if (isCodeTaken(game.code)) game.code = newJoinCode(isCodeTaken);
     games.set(game.id, game);

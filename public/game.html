@@ -64,6 +64,16 @@
 
     <aside class="side">
       <div id="winner"></div>
+      <section class="card hidden" id="music-ctl">
+        <h3>🎵 Музыка победы на экране</h3>
+        <div class="row music-ctl-row">
+          <button type="button" id="music-toggle" disabled>▶ Играть</button>
+          <label class="music-volume" title="Громкость на общем экране">🔉
+            <input type="range" id="music-volume" min="0" max="100" step="5" value="100" disabled>
+            <span id="music-volume-value">100%</span></label>
+        </div>
+        <div class="muted small" id="music-status"></div>
+      </section>
       <section class="card turn-card" id="turn"></section>
       <section class="card minimap" id="minimap">
         <div class="mm-me" id="mm-me"></div>
@@ -93,6 +103,7 @@
   <script src="/js/sounds.js"></script>
   <script src="/js/dice.js"></script>
   <script src="/js/board.js"></script>
+  <script src="/js/canvas.js"></script>
   <script src="/js/game.js"></script>
 </body>
 </html>

@@ -9,6 +9,7 @@ const { Server } = require('socket.io');
 const G = require('./game');
 const store = require('./store');
 const { inviteOrigin } = require('./urls');
+const { createVictoryMusic, MediaError, MAX_BYTES: MUSIC_MAX_BYTES } = require('./media');
 
 const PORT = Number(process.env.PORT) || 3000;
 const ADMIN_LOGIN = process.env.ADMIN_LOGIN || 'admin';
@@ -172,6 +173,7 @@ function gameSummary(game) {
     id: game.id,
     code: game.code,
     screenCode: game.screenCode,
+    tabletCode: game.tabletCode,
     name: game.name,
     status: game.status,
     createdAt: game.createdAt,
@@ -246,6 +248,12 @@ app.get('/api/join/:code', (req, res) => {
   res.json({ name: game.name, status: game.status, code: game.code });
 });
 
+app.get('/api/tablet/:code', (req, res) => {
+  const game = store.findByTabletCode(req.params.code);
+  if (!game) return res.status(404).json({ error: 'Планшет не найден. Проверьте ссылку.' });
+  res.json({ name: game.name, status: game.status });
+});
+
 app.get('/api/screen/:code', (req, res) => {
   const game = store.findByScreenCode(req.params.code);
   if (!game) return res.status(404).json({ error: 'Экран не найден. Проверьте ссылку.' });
@@ -261,6 +269,37 @@ app.get('/api/screen/:code/qr.svg', async (req, res) => {
   const url = `${origin}/join/${game.code}`;
   const svg = await QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
   res.type('image/svg+xml').set('Cache-Control', 'no-store').send(svg);
+});
+
+// ---------- Музыка победы (MP3, загружает администратор) ----------
+
+const victoryMusic = createVictoryMusic(store.DATA_DIR);
+
+app.get('/api/victory-music/info', (req, res) => {
+  res.set('Cache-Control', 'no-store').json(victoryMusic.info());
+});
+
+app.get('/api/victory-music', (req, res) => {
+  if (!victoryMusic.info().exists) return res.status(404).end();
+  res.type('audio/mpeg').set('Cache-Control', 'no-cache').sendFile(victoryMusic.file);
+});
+
+app.put('/api/admin/victory-music', requireAdmin,
+  express.raw({ type: () => true, limit: MUSIC_MAX_BYTES + 1024 }),
+  (req, res) => {
+    try {
+      const name = decodeURIComponent(String(req.get('x-file-name') || ''));
+      res.json(victoryMusic.save(req.body, name));
+    } catch (err) {
+      if (err instanceof MediaError) return res.status(400).json({ error: err.message });
+      console.error('Не удалось сохранить музыку победы:', err);
+      res.status(500).json({ error: 'Не удалось сохранить файл на сервере' });
+    }
+  });
+
+app.delete('/api/admin/victory-music', requireAdmin, (req, res) => {
+  victoryMusic.remove();
+  res.json(victoryMusic.info());
 });
 
 app.get('/api/version', (req, res) => {
@@ -291,7 +330,16 @@ app.get('/admin/game/:id', sendPage('game.html'));
 app.get('/join', sendPage('game.html'));
 app.get('/join/:code', sendPage('game.html'));
 app.get('/screen/:code', sendPage('screen.html'));
+app.get('/draw/:code', sendPage('draw.html'));
 app.use(express.static(PUBLIC_DIR, { index: false }));
+
+// Слишком большой запрос (например, MP3 больше лимита) — понятный ответ вместо страницы ошибки.
+app.use((err, req, res, next) => {
+  if (err && err.type === 'entity.too.large') {
+    return res.status(413).json({ error: `Файл больше ${MUSIC_MAX_BYTES / 1024 / 1024} МБ — выберите поменьше` });
+  }
+  return next(err);
+});
 
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 256 * 1024 });
@@ -333,7 +381,9 @@ function viewFor(game, viewer) {
     const { strokes, ...rest } = game.turn;
     turn = { ...rest, strokeCount: strokes.length };
     // Общий экран видят все, в том числе угадывающие, поэтому карточку на нём не показываем.
-    const hideCard = viewer.screen || (!viewer.admin && viewer.playerId && !G.seesCard(game, viewer.playerId));
+    // Планшет получает слово только в задании «Рисование» — его прячет кнопка, пока рисующий не попросит.
+    const hideCard = viewer.screen || (viewer.tablet && game.turn.category !== 'drawing')
+      || (!viewer.admin && viewer.playerId && !G.seesCard(game, viewer.playerId));
     if (hideCard) {
       turn.card = null;
       turn.cardHidden = true;
@@ -345,6 +395,7 @@ function viewFor(game, viewer) {
     id: game.id,
     code: game.code,
     screenCode: viewer.admin ? game.screenCode : undefined,
+    tabletCode: viewer.admin ? game.tabletCode : undefined,
     name: game.name,
     status: game.status,
     // Ловушки видит только администратор.
@@ -360,7 +411,7 @@ function viewFor(game, viewer) {
     log: game.log.slice(-60),
     cardsLeft: viewer.admin ? G.remainingCards(game, store.getCards()) : undefined,
     undo: viewer.admin && lastUndo ? { label: lastUndo.label, count: game.history.length } : null,
-    me: viewer.admin ? { admin: true } : viewer.screen ? { screen: true } : viewer.playerId ? { playerId: viewer.playerId } : null,
+    me: viewer.admin ? { admin: true } : viewer.screen ? { screen: true } : viewer.tablet ? { tablet: true } : viewer.playerId ? { playerId: viewer.playerId } : null,
   };
 }
 
@@ -477,8 +528,19 @@ async function kickPlayer(game, playerId) {
   }
 }
 
+// Планшет для рисования управляет только ходом с заданием «Рисование»: старт таймера и результат.
+const TABLET_ACTIONS = {
+  startTimer: (game) => G.startTimer(game),
+  finishTurn: (game, ctx, p) => G.finishTurn(game, { success: p.success }),
+};
+
 function handleAction(game, ctx, payload) {
   const type = payload?.type;
+  if (ctx.tablet) {
+    if (!TABLET_ACTIONS[type]) throw new G.GameError('Недоступное действие');
+    if (game.turn?.category !== 'drawing') throw new G.GameError('Сейчас не задание «Рисование»');
+    return TABLET_ACTIONS[type](game, ctx, payload);
+  }
   if (ctx.admin && ADMIN_ACTIONS[type]) return ADMIN_ACTIONS[type](game, ctx, payload);
   if (TURN_ACTIONS[type]) {
     if (!ctx.admin && !isActivePlayer(game, ctx.playerId)) throw new G.GameError('Сейчас ход другой команды');
@@ -492,6 +554,13 @@ function handleAction(game, ctx, payload) {
 }
 
 // ---------- Сокеты ----------
+
+// Музыка победы играет на общем экране, ведущий управляет ей из своей панели.
+// Экран сообщает состояние плеера, сервер хранит последнее (в памяти) и пересылает ведущему.
+const MUSIC_ACTIONS = new Set(['play', 'pause', 'volume']);
+const MUSIC_BLOCKS = new Set(['sound-off', 'not-allowed']);
+const musicStates = new Map(); // gameId → { playing, volume, blocked }
+const clampVolume = (v) => (Number.isFinite(Number(v)) ? Math.max(0, Math.min(1, Number(v))) : 1);
 
 io.on('connection', (socket) => {
   const auth = socket.handshake.auth || {};
@@ -508,6 +577,9 @@ io.on('connection', (socket) => {
   } else if (auth.screen) {
     game = store.findByScreenCode(String(auth.screen));
     if (game) ctx.screen = true;
+  } else if (auth.tablet) {
+    game = store.findByTabletCode(String(auth.tablet));
+    if (game) ctx.tablet = true;
   } else if (auth.code) {
     const ip = socketIp(socket);
     if (joinBlocked(ip)) {
@@ -529,6 +601,11 @@ io.on('connection', (socket) => {
   const currentGame = () => store.getGame(gameId);
   ctx.gameId = gameId;
   socket.join(`game:${gameId}`);
+  if (ctx.screen) socket.join(`screen:${gameId}`);
+  if (ctx.admin) {
+    socket.join(`admin:${gameId}`);
+    socket.emit('music:state', musicStates.get(gameId) || null);
+  }
   trackOnline(gameId, ctx.playerId, 1);
   publish(game);
 
@@ -569,7 +646,7 @@ io.on('connection', (socket) => {
   function canDraw(g) {
     const turn = g?.turn;
     if (!turn || turn.category !== 'drawing' || turn.phase === 'result') return false;
-    return ctx.admin || (ctx.playerId && ctx.playerId === turn.explainerId);
+    return ctx.admin || ctx.tablet || (ctx.playerId && ctx.playerId === turn.explainerId);
   }
 
   socket.on('draw:stroke', (stroke) => {
@@ -602,7 +679,27 @@ io.on('connection', (socket) => {
     ack(g?.turn ? { turnId: g.turn.id, strokes: g.turn.strokes } : { strokes: [] });
   });
 
+  socket.on('music:control', (cmd) => {
+    if (!ctx.admin || !cmd || !MUSIC_ACTIONS.has(cmd.action)) return;
+    io.to(`screen:${gameId}`).emit('music:control', { action: cmd.action, volume: clampVolume(cmd.volume) });
+  });
+
+  socket.on('music:state', (data) => {
+    if (!ctx.screen || !data) return;
+    const clean = {
+      playing: Boolean(data.playing),
+      volume: clampVolume(data.volume),
+      blocked: MUSIC_BLOCKS.has(data.blocked) ? data.blocked : null,
+    };
+    musicStates.set(gameId, clean);
+    io.to(`admin:${gameId}`).emit('music:state', clean);
+  });
+
   socket.on('disconnect', () => {
+    if (ctx.screen && !io.sockets.adapter.rooms.get(`screen:${gameId}`)?.size) {
+      musicStates.delete(gameId);
+      io.to(`admin:${gameId}`).emit('music:state', null);
+    }
     trackOnline(gameId, ctx.playerId, -1);
     const g = currentGame();
     if (g) publish(g);

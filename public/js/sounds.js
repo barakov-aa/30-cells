@@ -19,6 +19,7 @@ window.Sounds = (() => {
       master = ctx.createGain();
       master.gain.value = 0.8;
       master.connect(ctx.destination);
+      ctx.onstatechange = notifyMusic; // браузер разрешил звук — ведущему больше не нужна подсказка
     }
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
@@ -76,6 +77,51 @@ window.Sounds = (() => {
     tone({ f: f * 1.004, t, d, type: 'sawtooth', g: g * 0.6, a: 0.02, cutoff: 2200 });
   }
 
+  // Музыка победы — MP3, который загрузил администратор. Играет только на общем экране;
+  // ведущий ставит её на паузу и меняет громкость из своей панели.
+  let music = null;
+  const clampVolume = (v) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1);
+  let musicVolume = clampVolume(Number(readVolume() ?? 1));
+  const musicListeners = new Set();
+
+  function readVolume() {
+    try { return localStorage.getItem('victory-volume'); } catch { return null; }
+  }
+  function musicState() {
+    const playing = Boolean(music && !music.paused && !music.ended);
+    const blocked = !enabled ? 'sound-off' : (!ctx || ctx.state !== 'running') ? 'not-allowed' : null;
+    return { playing, volume: musicVolume, blocked };
+  }
+  function notifyMusic() {
+    const s = musicState();
+    musicListeners.forEach((cb) => cb(s));
+  }
+  function stopVictory() {
+    if (!music) return;
+    music.pause();
+    music = null;
+    notifyMusic();
+  }
+  // Играть музыку: с начала (fromStart) или продолжить с паузы. false — музыки нет или звук недоступен.
+  async function playMusic(fromStart = false) {
+    if (!enabled) return false;
+    try {
+      if (!music || fromStart) {
+        const info = await fetch('/api/victory-music/info').then((r) => r.json());
+        if (!info.exists || !enabled) return false;
+        stopVictory();
+        music = new Audio(`/api/victory-music?v=${encodeURIComponent(info.updatedAt)}`);
+        music.volume = musicVolume;
+        ['play', 'pause', 'ended'].forEach((e) => music.addEventListener(e, notifyMusic));
+      }
+      await music.play();
+      return true;
+    } catch {
+      notifyMusic();
+      return false;
+    }
+  }
+
   const guard = (fn) => (...args) => {
     if (!enabled) return;
     try { fn(...args); } catch { /* звук недоступен */ }
@@ -87,7 +133,12 @@ window.Sounds = (() => {
     /** Звук включён, но браузер ещё не разрешил его (страницу ни разу не кликали). */
     get blocked() { return Boolean(enabled && (!ctx || ctx.state !== 'running')); },
     get enabled() { return enabled; },
-    set enabled(value) { enabled = Boolean(value); if (enabled) this.unlock(); },
+    set enabled(value) {
+      enabled = Boolean(value);
+      if (enabled) this.unlock();
+      else stopVictory();
+      notifyMusic();
+    },
 
     // Последние секунды таймера (s = 5…1): тиканье и сигнал, который с каждой секундой выше и громче.
     countdown: guard((s) => {
@@ -117,5 +168,24 @@ window.Sounds = (() => {
       [0, 0.14, 0.28].forEach((t) => brass({ f: 392, t, d: 0.12, g: 0.13 }));
       [523.25, 659.25, 783.99, 1046.5].forEach((f) => brass({ f, t: 0.46, d: 1.5, g: 0.09 }));
     }),
+
+    // Победа на общем экране: музыка администратора, а если её нет или браузер не дал её включить — фанфары.
+    async victory() {
+      if (!enabled) return;
+      if (!(await playMusic(true))) this.win();
+    },
+    stopVictory,
+    /** Управление музыкой победы от ведущего: продолжить (или начать заново), пауза, громкость 0…1. */
+    playMusic: () => playMusic(false),
+    pauseMusic() { music?.pause(); },
+    setMusicVolume(v) {
+      musicVolume = clampVolume(Number(v));
+      try { localStorage.setItem('victory-volume', String(musicVolume)); } catch { /* без запоминания */ }
+      if (music) music.volume = musicVolume;
+      notifyMusic();
+    },
+    /** Подписка на состояние музыки: { playing, volume, blocked: null | 'sound-off' | 'not-allowed' }. */
+    onMusicChange(cb) { musicListeners.add(cb); },
+    get musicState() { return musicState(); },
   };
 })();

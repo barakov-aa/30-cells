@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Планшет — 30 клеток</title>
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#d9480f">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/draw.css">
+</head>
+<body class="tablet">
+  <div class="tb-fatal hidden" id="fatal"><div class="card"><h2>Планшет недоступен</h2><p id="fatal-text"></p></div></div>
+
+  <div class="tb-layout" id="layout">
+    <header class="tb-head">
+      <span class="tb-title" id="title">✏️ Планшет</span>
+      <span class="tb-timer hidden" id="timer"></span>
+      <button type="button" id="btn-full" title="Во весь экран">⛶</button>
+      <span class="conn off" id="conn">● нет связи</span>
+    </header>
+
+    <main class="tb-idle" id="idle">
+      <div class="tb-idle-icon">✏️</div>
+      <h1>Планшет для рисования</h1>
+      <p id="idle-text">Когда выпадет задание «Рисование», здесь появится холст.</p>
+    </main>
+
+    <main class="tb-main hidden" id="main">
+      <div class="tb-canvas-box" id="canvas-box">
+        <div class="tb-canvas canvas-wrap" id="canvas-wrap">
+          <canvas id="canvas" width="1200" height="900"></canvas>
+          <div class="tb-overlay hidden" id="overlay"></div>
+        </div>
+      </div>
+      <aside class="tb-side">
+        <div class="tb-who" id="who"></div>
+        <div class="tb-word">
+          <button type="button" class="tb-word-btn" id="word-btn">👁 Показать слово</button>
+          <div class="tb-word-text hidden" id="word"></div>
+        </div>
+        <div class="tb-tools" id="tools"></div>
+        <div class="tb-actions" id="actions"></div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/canvas.js"></script>
+  <script src="/js/draw.js"></script>
+</body>
+</html>

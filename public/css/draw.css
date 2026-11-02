@@ -1,0 +1,65 @@
+/* Планшет для рисования: всё на одном экране без прокрутки, кнопки под палец. */
+body.tablet {
+  height: 100vh; height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+}
+.tb-layout { height: 100%; display: flex; flex-direction: column; padding: 10px 12px; gap: 10px; }
+.tb-head { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+.tb-title { font-weight: 800; font-size: 20px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-timer { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tb-timer.low { color: var(--bad); }
+
+.tb-idle { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; }
+.tb-idle-icon { font-size: 72px; }
+.tb-idle h1 { margin: 8px 0; }
+.tb-idle p { color: var(--muted); font-size: 20px; max-width: 32em; }
+
+.tb-main { flex: 1; min-height: 0; display: flex; gap: 12px; }
+.tb-canvas-box { flex: 1; min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.tb-canvas { flex: none; }
+.tb-canvas canvas { width: 100%; height: 100%; aspect-ratio: auto; }
+.tb-overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 1em; font-size: 24px; font-weight: 700; color: var(--text);
+  background: rgba(255, 255, 255, 0.82);
+}
+@media (prefers-color-scheme: dark) { .tb-overlay { background: rgba(39, 35, 31, 0.86); } }
+
+.tb-side { width: 280px; flex: none; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+.tb-who { display: flex; flex-direction: column; gap: 2px; font-size: 17px; }
+.tb-team { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 20px; }
+.tb-who .trap-banner { margin-top: 6px; }
+.tb-word-btn { width: 100%; }
+.tb-word-text {
+  margin-top: 8px; padding: 12px; border-radius: 12px; text-align: center;
+  background: var(--surface-2); border: 2px dashed var(--accent-2); font-size: 26px; font-weight: 800; overflow-wrap: anywhere;
+}
+.tb-tools { display: flex; flex-direction: column; gap: 10px; }
+.tb-tools:empty { display: none; }
+.tb-swatches, .tb-widths { display: flex; flex-wrap: wrap; gap: 8px; }
+.tb-swatches .swatch {
+  width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--border); padding: 0; font-size: 20px; cursor: pointer;
+}
+.tb-swatches .swatch.active { outline: 4px solid var(--accent-2); outline-offset: 1px; }
+.tb-widths button { width: 52px; height: 44px; display: flex; align-items: center; justify-content: center; padding: 0; }
+.tb-widths button span { display: block; border-radius: 50%; background: currentColor; }
+.tb-widths button.active { outline: 3px solid var(--accent-2); }
+.tb-actions { display: flex; flex-direction: column; gap: 10px; margin-top: auto; }
+.tb-actions button.big { width: 100%; font-size: 22px; padding: 16px; }
+.tb-actions small { display: block; font-size: 15px; font-weight: 600; opacity: 0.9; }
+
+.tb-fatal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; }
+
+/* Книжная ориентация и узкие экраны: холст сверху, панель снизу. */
+@media (orientation: portrait), (max-width: 760px) {
+  .tb-main { flex-direction: column; }
+  .tb-side { width: auto; flex: none; max-height: 45%; display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+  .tb-who, .tb-word { grid-column: 1; }
+  .tb-tools { grid-column: 2; grid-row: 1 / span 2; }
+  .tb-actions { grid-column: 1 / -1; flex-direction: row; margin-top: 0; }
+  .tb-actions button.big { flex: 1; font-size: 19px; padding: 12px; }
+  .tb-actions .muted { align-self: center; }
+}

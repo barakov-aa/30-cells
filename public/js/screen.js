@@ -84,6 +84,15 @@
   socket.on('connect', () => {
     $('#conn').className = 'conn on';
     $('#conn').textContent = '● онлайн';
+    socket.emit('music:state', Sounds.musicState);
+  });
+
+  // Музыкой победы управляет ведущий из своей панели; экран сообщает ему, играет ли она.
+  Sounds.onMusicChange((s) => socket.connected && socket.emit('music:state', s));
+  socket.on('music:control', ({ action, volume }) => {
+    if (action === 'play') Sounds.playMusic();
+    else if (action === 'pause') Sounds.pauseMusic();
+    else if (action === 'volume') Sounds.setMusicVolume(volume);
   });
   socket.on('disconnect', () => {
     $('#conn').className = 'conn off';
@@ -303,6 +312,7 @@
     const winner = state.teams.find((t) => t.id === state.winnerTeamId);
     if (!winner) {
       el.classList.add('hidden');
+      if (winnerShownFor) Sounds.stopVictory(); // победу отменили или игру сбросили
       winnerShownFor = null;
       return;
     }
@@ -315,38 +325,18 @@
       if (board.isAnimating()) setTimeout(show, 300);
       else {
         el.classList.remove('hidden');
-        Sounds.win();
+        Sounds.victory();
       }
     };
     setTimeout(show, 300);
   }
-  $('#winner').addEventListener('click', () => $('#winner').classList.add('hidden'));
+  $('#winner').addEventListener('click', () => {
+    $('#winner').classList.add('hidden');
+  });
 
   // ---------- Рисунок (только просмотр) ----------
 
-  const canvas = $('#canvas');
-  const ctx2d = canvas.getContext('2d');
-  let strokes = [];
-  let drawTurnId = null;
-
-  function drawStroke(s) {
-    if (!s.points.length) return;
-    ctx2d.strokeStyle = s.color;
-    ctx2d.lineWidth = s.width * (canvas.width / 600);
-    ctx2d.lineCap = 'round';
-    ctx2d.lineJoin = 'round';
-    ctx2d.beginPath();
-    const [x0, y0] = s.points[0];
-    ctx2d.moveTo(x0 * canvas.width, y0 * canvas.height);
-    if (s.points.length === 1) ctx2d.lineTo(x0 * canvas.width + 0.1, y0 * canvas.height);
-    for (const [x, y] of s.points.slice(1)) ctx2d.lineTo(x * canvas.width, y * canvas.height);
-    ctx2d.stroke();
-  }
-  function redraw() {
-    ctx2d.fillStyle = '#fff';
-    ctx2d.fillRect(0, 0, canvas.width, canvas.height);
-    strokes.forEach(drawStroke);
-  }
+  const drawing = window.DrawCanvas.create($('#canvas'), socket);
 
   function renderCanvas() {
     const turn = state.turn;
@@ -355,29 +345,8 @@
     $('#board').style.visibility = visible || state.status === 'lobby' ? 'hidden' : '';
     if (!visible) return;
     $('#canvas-title').textContent = `✏️ Рисует ${playerName(turn.explainerId) || 'объясняющий'}`;
-    if (drawTurnId !== turn.id) {
-      drawTurnId = turn.id;
-      strokes = [];
-      redraw();
-      socket.emit('draw:sync', (res) => {
-        if (res.turnId === drawTurnId) {
-          strokes = res.strokes;
-          redraw();
-        }
-      });
-    }
+    drawing.setTurn(turn.id);
   }
-
-  socket.on('draw:stroke', ({ turnId, stroke }) => {
-    if (turnId !== drawTurnId) return;
-    strokes.push(stroke);
-    drawStroke(stroke);
-  });
-  socket.on('draw:clear', ({ turnId }) => {
-    if (turnId !== drawTurnId) return;
-    strokes = [];
-    redraw();
-  });
 
   // ---------- Старт ----------
 

@@ -9,7 +9,10 @@
     $('#login').classList.toggle('hidden', admin);
     $('#dashboard').classList.toggle('hidden', !admin);
     $('#logout').classList.toggle('hidden', !admin);
-    if (admin) loadGames();
+    if (admin) {
+      loadGames();
+      loadMusic();
+    }
     else $('#login-name').focus();
   }
 
@@ -71,6 +74,7 @@
         <div class="row">
           <button data-copy="${esc(g.code)}">📋 Ссылка для гостей</button>
           <a class="btn" href="/screen/${esc(g.screenCode)}" target="_blank" rel="noopener" title="Поле для общего экрана">📺 Экран</a>
+          <a class="btn" href="/draw/${esc(g.tabletCode)}" target="_blank" rel="noopener" title="Большой холст для задания «Рисование» — откройте на планшете">✏️ Планшет</a>
           <a class="btn primary" href="/admin/game/${esc(g.id)}">Открыть</a>
           <button class="icon" data-del="${esc(g.id)}" title="Удалить">🗑️</button>
         </div>
@@ -122,4 +126,66 @@
   const loadComplications = () => complicationsEditor.load().catch((err) => toast(err.message, true));
 
   init().catch((err) => toast(err.message, true));
+
+  // ---------- Музыка победы ----------
+
+  const mb = (n) => `${(n / 1024 / 1024).toFixed(1).replace('.', ',')} МБ`;
+
+  async function loadMusic() {
+    try {
+      const info = await api('GET', '/api/victory-music/info');
+      $('#music-delete').classList.toggle('hidden', !info.exists);
+      $('#music-current').innerHTML = info.exists
+        ? `<div>Сейчас: <b>${esc(info.name)}</b> · ${mb(info.size)}</div>
+          <audio controls preload="none" src="/api/victory-music?v=${encodeURIComponent(info.updatedAt)}"></audio>`
+        : 'Музыка не загружена — при победе звучат фанфары.';
+    } catch (err) {
+      $('#music-current').textContent = err.message;
+    }
+  }
+
+  $('#music-upload').addEventListener('click', async () => {
+    const file = $('#music-file').files[0];
+    const errorEl = $('#music-error');
+    errorEl.textContent = '';
+    if (!file) {
+      errorEl.textContent = 'Сначала выберите MP3-файл';
+      return;
+    }
+    const btn = $('#music-upload');
+    btn.disabled = true;
+    btn.textContent = 'Загружаю…';
+    try {
+      const res = await fetch('/api/admin/victory-music', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'audio/mpeg', 'X-File-Name': encodeURIComponent(file.name) },
+        body: file,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // 413 без JSON — ответ nginx: его лимит размера запроса меньше файла.
+        throw new Error(data?.error || (res.status === 413
+          ? 'Сервер не принял такой большой файл: увеличьте client_max_body_size в настройках nginx (см. README)'
+          : `Не удалось загрузить файл (ошибка ${res.status})`));
+      }
+      $('#music-file').value = '';
+      toast('Музыка победы загружена');
+      loadMusic();
+    } catch (err) {
+      errorEl.textContent = err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Загрузить';
+    }
+  });
+
+  $('#music-delete').addEventListener('click', async () => {
+    try {
+      await api('DELETE', '/api/admin/victory-music');
+      toast('Музыка удалена — при победе снова фанфары');
+      loadMusic();
+    } catch (err) {
+      $('#music-error').textContent = err.message;
+    }
+  });
 })();

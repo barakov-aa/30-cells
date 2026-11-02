@@ -100,6 +100,18 @@
     return a && el.contains(a) && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName);
   }
 
+  // Пока палец или кнопка мыши нажаты, панели не перерисовываем: иначе кнопка, на которую нажимают,
+  // заменится новой между нажатием и отпусканием, и браузер не засчитает клик
+  // (так терялось «＋ Команда» после ввода названия). Отложенная перерисовка — сразу после клика.
+  let pressing = false;
+  document.addEventListener('pointerdown', () => { pressing = true; }, true);
+  const release = () => {
+    pressing = false;
+    setTimeout(renderDeferred, 0);
+  };
+  document.addEventListener('pointerup', release, true);
+  document.addEventListener('pointercancel', release, true);
+
   // ---------- Звук ----------
   // Звуки (public/js/sounds.js) у игроков и ведущего выключены по умолчанию — играет общий экран;
   // кнопка 🔇/🔊 в шапке включает их на этом устройстве.
@@ -241,7 +253,7 @@
   }
 
   // Фанфары — когда победитель появился во время игры (не при открытии уже законченной игры)
-  // и только после того, как фишка дошла до финиша.
+  // и только после того, как фишка дошла до финиша. Музыка победы играет только на общем экране.
   let winSoundFor;
   function soundWinner() {
     if (winSoundFor === undefined || !state.winnerTeamId) {
@@ -465,7 +477,7 @@
     const lobby = state.status === 'lobby';
     const visible = !isAdmin && p && (lobby || !p.teamId);
     el.classList.toggle('hidden', !visible);
-    if (!visible || focusedInside(el)) return;
+    if (!visible || focusedInside(el) || pressing) return;
     const team = myTeam();
     const options = state.teams.map((t) => {
       const members = t.players.map((id) => esc(playerName(id))).join(', ') || '<span class="muted">пока никого</span>';
@@ -510,12 +522,53 @@
 
   // ---------- Панель администратора ----------
 
+  // Музыка победы играет на общем экране; ведущий ставит её на паузу и меняет громкость.
+  // Карточка не перерисовывается вместе с панелью, чтобы ползунок не сбивался во время перетаскивания.
+  let musicState = null;
+  let musicName = null;
+  function renderMusicCtl() {
+    const toggle = $('#music-toggle');
+    const volume = $('#music-volume');
+    const ready = Boolean(musicName && musicState);
+    toggle.disabled = !ready;
+    volume.disabled = !ready;
+    toggle.textContent = musicState?.playing ? '⏸ Пауза' : '▶ Играть';
+    if (musicState && document.activeElement !== volume) volume.value = Math.round(musicState.volume * 100);
+    $('#music-volume-value').textContent = `${volume.value}%`;
+    let status;
+    if (!musicName) status = 'Музыка не загружена — при победе звучат фанфары. Загрузить MP3 можно на <a href="/admin">странице игр</a>.';
+    else if (!musicState) status = 'Общий экран не открыт — откройте «📺 Экран», чтобы управлять музыкой.';
+    else if (musicState.blocked === 'sound-off') status = 'На экране выключен звук — включите его кнопкой на экране.';
+    else if (musicState.blocked === 'not-allowed') status = 'Браузер экрана ещё не разрешил звук — нажмите на экран мышью или любую клавишу.';
+    else status = `${esc(musicName)} · ${musicState.playing ? 'играет' : 'не играет'}. При победе включается сама.`;
+    $('#music-status').innerHTML = status;
+  }
+  if (isAdmin) {
+    $('#music-ctl').classList.remove('hidden');
+    fetch('/api/victory-music/info').then((r) => r.json()).then((info) => {
+      musicName = info.exists ? info.name : null;
+      renderMusicCtl();
+    }).catch(() => {});
+    socket.on('music:state', (s) => {
+      musicState = s;
+      renderMusicCtl();
+    });
+    $('#music-toggle').addEventListener('click', () => {
+      socket.emit('music:control', { action: musicState?.playing ? 'pause' : 'play' });
+    });
+    $('#music-volume').addEventListener('input', (e) => {
+      $('#music-volume-value').textContent = `${e.target.value}%`;
+      socket.emit('music:control', { action: 'volume', volume: e.target.value / 100 });
+    });
+    renderMusicCtl();
+  }
+
   let adminDirty = false;
   function renderAdmin() {
     const el = $('#admin');
     el.classList.toggle('hidden', !isAdmin);
     if (!isAdmin) return;
-    if (focusedInside(el)) {
+    if (focusedInside(el) || pressing) {
       adminDirty = true;
       return;
     }
@@ -541,6 +594,7 @@
       <div class="row" style="margin-top:6px">
         <button data-act="copy-invite">📋 Копировать</button>
         <a class="btn" href="/screen/${esc(state.screenCode)}" target="_blank" rel="noopener" title="Поле для общего экрана без лишних элементов">📺 Экран</a>
+        <a class="btn" href="/draw/${esc(state.tabletCode)}" target="_blank" rel="noopener" title="Большой холст для задания «Рисование» — откройте на планшете">✏️ Планшет</a>
         <button data-act="new-invite" title="Старые ссылка и код перестанут работать для новых гостей">🔄 Новый код</button>
         <button data-act="rename-game">✎ Название</button>
       </div>
@@ -603,13 +657,12 @@
       ${unassigned.length ? `<h3 style="margin-top:14px">Без команды</h3>${unassigned.map(member).join('')}` : ''}`;
   }
 
-  document.addEventListener('focusout', () => {
-    setTimeout(() => {
-      if (!state) return; // игра ещё не загружена (например, открыта форма ввода кода)
-      if (adminDirty && !focusedInside($('#admin'))) renderAdmin();
-      if (!focusedInside($('#team-pick'))) renderTeamPick();
-    }, 0);
-  });
+  function renderDeferred() {
+    if (!state || pressing) return; // игра ещё не загружена (например, открыта форма ввода кода)
+    if (adminDirty && !focusedInside($('#admin'))) renderAdmin();
+    if (!focusedInside($('#team-pick'))) renderTeamPick();
+  }
+  document.addEventListener('focusout', () => setTimeout(renderDeferred, 0));
 
   // ---------- Обработчики ----------
 
@@ -734,13 +787,9 @@
 
   // ---------- Рисование ----------
 
-  const canvas = $('#canvas');
-  const ctx2d = canvas.getContext('2d');
-  const COLORS = ['#222222', '#e03131', '#1971c2', '#2f9e44', '#f08c00', '#9c36b5', '#ffffff'];
-  let strokes = [];
-  let drawTurnId = null;
-  let pen = { color: COLORS[0], width: 6 };
-  let currentStroke = null;
+  const { COLORS, WIDTHS } = window.DrawCanvas;
+  const drawing = window.DrawCanvas.create($('#canvas'), socket, { canDraw });
+  const pen = drawing.pen;
 
   function canDraw() {
     const turn = state?.turn;
@@ -748,47 +797,17 @@
     return isAdmin || state.me?.playerId === turn.explainerId;
   }
 
-  function drawStroke(s) {
-    if (!s.points.length) return;
-    ctx2d.strokeStyle = s.color;
-    ctx2d.lineWidth = s.width * (canvas.width / 600);
-    ctx2d.lineCap = 'round';
-    ctx2d.lineJoin = 'round';
-    ctx2d.beginPath();
-    const [x0, y0] = s.points[0];
-    ctx2d.moveTo(x0 * canvas.width, y0 * canvas.height);
-    if (s.points.length === 1) ctx2d.lineTo(x0 * canvas.width + 0.1, y0 * canvas.height);
-    for (const [x, y] of s.points.slice(1)) ctx2d.lineTo(x * canvas.width, y * canvas.height);
-    ctx2d.stroke();
-  }
-
-  function redraw() {
-    ctx2d.fillStyle = '#fff';
-    ctx2d.fillRect(0, 0, canvas.width, canvas.height);
-    strokes.forEach(drawStroke);
-  }
-
   function renderDrawPanel() {
     const turn = state.turn;
     const visible = Boolean(turn && turn.category === 'drawing' && turn.phase !== 'prepare');
     $('#draw-panel').classList.toggle('hidden', !visible);
     if (!visible) return;
-    if (drawTurnId !== turn.id) {
-      drawTurnId = turn.id;
-      strokes = [];
-      redraw();
-      socket.emit('draw:sync', (res) => {
-        if (res.turnId === drawTurnId) {
-          strokes = res.strokes;
-          redraw();
-        }
-      });
-    }
+    drawing.setTurn(turn.id);
     const drawer = canDraw();
     $('#draw-hint').textContent = drawer ? 'Рисуйте! Буквы и цифры нельзя.' : `Рисует ${playerName(turn.explainerId)}`;
     $('#draw-tools').innerHTML = drawer
       ? `${COLORS.map((c) => `<button class="swatch ${pen.color === c ? 'active' : ''}" style="background:${c}" data-color="${c}" title="${c === '#ffffff' ? 'Ластик' : ''}"></button>`).join('')}
-        <select id="pen-width"><option value="3">Тонко</option><option value="6">Средне</option><option value="14">Толсто</option><option value="30">Очень толсто</option></select>
+        <select id="pen-width">${WIDTHS.map(([w, label]) => `<option value="${w}">${label}</option>`).join('')}</select>
         <div class="spacer"></div><button data-draw="clear">🧽 Очистить</button>`
       : '';
     const sel = $('#pen-width');
@@ -801,52 +820,10 @@
       pen.color = sw.dataset.color;
       renderDrawPanel();
     }
-    if (e.target.closest('[data-draw="clear"]') && confirm('Очистить рисунок?')) socket.emit('draw:clear');
+    if (e.target.closest('[data-draw="clear"]') && confirm('Очистить рисунок?')) drawing.clear();
   });
   $('#draw-tools').addEventListener('change', (e) => {
     if (e.target.id === 'pen-width') pen.width = Number(e.target.value);
-  });
-
-  function point(e) {
-    const r = canvas.getBoundingClientRect();
-    return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))];
-  }
-  function flush(final) {
-    if (!currentStroke || currentStroke.points.length === 0) return;
-    socket.emit('draw:stroke', currentStroke);
-    // Длинные линии отправляем частями, чтобы зрители видели рисунок сразу.
-    const last = currentStroke.points[currentStroke.points.length - 1];
-    currentStroke = final ? null : { ...currentStroke, points: [last] };
-  }
-  canvas.addEventListener('pointerdown', (e) => {
-    if (!canDraw()) return;
-    canvas.setPointerCapture(e.pointerId);
-    currentStroke = { color: pen.color, width: pen.width, points: [point(e)] };
-    strokes.push({ ...currentStroke, points: currentStroke.points.slice() });
-    drawStroke(strokes[strokes.length - 1]);
-  });
-  canvas.addEventListener('pointermove', (e) => {
-    if (!currentStroke) return;
-    const pt = point(e);
-    currentStroke.points.push(pt);
-    const local = strokes[strokes.length - 1];
-    local.points.push(pt);
-    drawStroke({ ...local, points: local.points.slice(-2) });
-    if (currentStroke.points.length >= 40) flush(false);
-  });
-  const endStroke = () => flush(true);
-  canvas.addEventListener('pointerup', endStroke);
-  canvas.addEventListener('pointercancel', endStroke);
-
-  socket.on('draw:stroke', ({ turnId, stroke }) => {
-    if (turnId !== drawTurnId) return;
-    strokes.push(stroke);
-    drawStroke(stroke);
-  });
-  socket.on('draw:clear', ({ turnId }) => {
-    if (turnId !== drawTurnId) return;
-    strokes = [];
-    redraw();
   });
 
   // ---------- Вход по коду ----------

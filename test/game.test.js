@@ -696,3 +696,23 @@ test('неполной при старте считается только ко�
   assert.match(warn, /Один/);
   assert.doesNotMatch(warn, /Пара|Тройка/);
 });
+
+test('планшет: результат во время таймера останавливает его и засчитывает ход', () => {
+  const game = setup();
+  assert.ok(game.tabletCode);
+  assert.notEqual(game.tabletCode, game.screenCode);
+  const team = G.currentTeam(game);
+  const from = team.position;
+  G.roll(game, cards, seq(at(G.DIE_FACES.indexOf('drawing'), G.DIE_FACES.length), 0.1, 0.1));
+  assert.throws(() => G.finishTurn(game, { success: true }), /недоступно/); // таймер ещё не запущен
+  G.startTimer(game);
+  G.finishTurn(game, { success: true });
+  assert.equal(game.turn, null);
+  assert.equal(team.position, from + G.CATEGORIES.drawing.points);
+  // после «время вышло» — как обычный результат
+  G.roll(game, cards, seq(at(G.DIE_FACES.indexOf('drawing'), G.DIE_FACES.length), 0.2, 0.2));
+  G.startTimer(game);
+  G.stopTimer(game);
+  G.finishTurn(game, { success: false });
+  assert.equal(game.turn, null);
+});

@@ -581,6 +581,11 @@ label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 
   margin: 0 0 10px; padding: 6px 10px; border-radius: 10px; font-weight: 800; text-align: center;
   background: linear-gradient(135deg, #ffe066, #fab005); color: #5c3d00;
 }
+.music-ctl-row { flex-wrap: wrap; }
+.music-volume { display: flex; align-items: center; gap: 8px; flex: 1 1 200px; margin: 0; font-weight: normal; }
+.music-volume input { flex: 1; min-width: 0; }
+#music-ctl h3 { margin: 0 0 8px; }
+#music-status { margin-top: 6px; }
 button.boost-on { background: linear-gradient(135deg, #ffe066, #fab005); color: #5c3d00; border-color: #f59f00; font-weight: 800; }
 
 /* 3D-кубик (public/js/dice.js): грани квадратные и смыкаются без зазоров, скругление — внутри грани. */
@@ -614,3 +619,5 @@ button.boost-on { background: linear-gradient(135deg, #ffe066, #fab005); color: 
 }
 body.player .turn-card .dice3d { --s: 64px; }
 .die-slot { width: 100%; align-self: stretch; }
+.music-current { display: grid; gap: 6px; margin-bottom: 8px; }
+.music-current audio { width: 100%; max-width: 420px; }

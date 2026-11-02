@@ -153,6 +153,7 @@ function createGame(name) {
     id: newId(),
     code: newJoinCode(),
     screenCode: newCode(),
+    tabletCode: newCode(), // планшет для рисования: свой код, потому что с него отмечают результат хода
     name: title,
     createdAt: Date.now(),
     status: 'lobby', // lobby | playing | finished
@@ -701,6 +702,15 @@ function expireTimer(game, now = Date.now()) {
   return true;
 }
 
+/**
+ * Результат с планшета для рисования: «Угадали» / «Не угадали» можно нажать и во время таймера —
+ * таймер останавливается, и ход сразу засчитывается.
+ */
+function finishTurn(game, result) {
+  if (game.turn?.phase === 'timer') stopTimer(game);
+  return resolve(game, result);
+}
+
 /** Подсчёт перемещения за ход. Возвращает изменение позиции и счёта. */
 // Ускорение (включает ведущий, если игра затянулась): баллы за правильные ответы ×2.
 // Штраф за неудачное удвоение не растёт — иначе игра, наоборот, затянулась бы.
@@ -897,6 +907,7 @@ module.exports = {
   JOIN_CODE_LENGTH,
   log,
   createGame,
+  finishTurn,
   addPlayer,
   renamePlayer,
   createTeam,
